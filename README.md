@@ -5,7 +5,7 @@
 
 ### Steps for executing the project from the jar file.<br>
 <b>Step 1</b>: Navigate to the jar file in the bin folder. <br>
-<b>Step 2</b>: Open cmd inside the bin folder and run the command '--module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media'.<br>
+<b>Step 2</b>: Open cmd inside the bin folder and run the command 'java --module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media -jar run.jar'.<br>
 
 
 ### Steps for executing the project from eclipse <br>
