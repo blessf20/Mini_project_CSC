@@ -4,15 +4,15 @@
 ## Project name: GraphInk
 
 ### Steps for executing the project from the jar file.
-Step 1: Navigate to the jar file. 
+<b>Step 1<\b>: Navigate to the jar file. 
 
-Step 2: Inside the bin folder run the command "--module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media".
+<b>Step 2<\b>: Inside the bin folder run the command "--module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media".
 
 
 
 ### Steps for executing the project from eclipse
-Step 1: Setup javafx.
+<b>Step 1<\b>: Setup javafx.
 
-Step 2: add the *gs-core-2.0.jar* and *gs-ui-javafx-2.0.jar* jar files to build path. These are the jar files used by GraphStream to render graphs in javafx.
+<b>Step 2<\b>: add the *gs-core-2.0.jar* and *gs-ui-javafx-2.0.jar* jar files to build path. These are the jar files used by GraphStream to render graphs in javafx.
 
-Step 3: Run the program.
+<b>Step 3<\b>: Run the program.
