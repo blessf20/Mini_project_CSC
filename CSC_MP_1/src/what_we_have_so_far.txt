@@ -1,0 +1,4586 @@
+package skeletonizer;
+
+import java.util.ArrayList;
+
+import images.BWImage;
+/**
+ * Applies the Zhang Suen thinning to a black and white image
+ * @author Leon Nkadimeng
+ */
+public class BWImageSkeletonizer {
+	
+	/**
+	 * Sums the pixel values of pixels around the 3x3 neighborhood excluding the center pixel
+	 * @param image black and white image with pixels
+	 * @param x x-coordinate of center pixel
+	 * @param y y-coordinate of center pixel
+	 * @return the sum of surrounding pixels
+	 */
+	private static int sumPixels(BWImage image, int x, int y) {
+		int sum = 0;
+		sum += image.getPixel(x, y - 1);
+		sum += image.getPixel(x + 1, y - 1);
+		sum += image.getPixel(x + 1, y);
+		sum += image.getPixel(x + 1, y + 1);
+		sum += image.getPixel(x, y + 1);
+		sum += image.getPixel(x - 1, y + 1);
+		sum += image.getPixel(x - 1, y);
+		sum += image.getPixel(x - 1, y - 1);
+		return sum;
+	}
+	/**
+	 * Calculate the number of 0 to 1 transitions around a given pixel in clockwise direction
+	 * @param image black and white image containing pixels
+	 * @param x x-coordinate of pixel
+	 * @param y y-coordinate of pixel
+	 * @return the number of 0 to 1 transitions around a the pixel
+	 */
+	private static int num0To1Transitions(BWImage image, int x, int y) {
+		int numTransitions = 0;
+		
+		if(image.getPixel(x, y - 1) == 0 && image.getPixel(x + 1, y - 1) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x + 1, y - 1) == 0 && image.getPixel(x + 1, y) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x + 1, y) ==  0 &&  image.getPixel(x + 1, y + 1) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x + 1, y + 1) == 0 && image.getPixel(x, y + 1) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x, y+1) == 0 && image.getPixel(x - 1, y + 1) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x - 1, y + 1) == 0 && image.getPixel(x - 1, y) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x - 1, y) == 0 && image.getPixel(x - 1, y - 1) == 1)
+			numTransitions++;
+		
+		if(image.getPixel(x - 1, y - 1) == 0 && image.getPixel(x, y - 1) == 1)
+			numTransitions++;
+		
+		return numTransitions;
+	}
+	
+	/**
+	 * Class representing the position of an image pixel
+	 */
+	private static class Pixel {
+		private int x, y;
+		public Pixel(int x, int y) {
+			this.x = x;
+			this.y = y;
+			//this.value = value;
+		}
+		
+		public int getX() { return x;}
+		public int getY() {return y;}
+		public String toString() {return String.format("%s %s", x, y);}
+		//public int getValue() {return value;}
+	}
+	/**
+	 * Skeletonize the image by applying the Zhang Suen algorithm until there are no more pixels changed.
+	 * @param image the black and white imaeg we want to skeletonize
+	 * @return skeletonized image
+	 */
+	public static BWImage skeletonize(BWImage image) {
+		// number of pixels set from 1 to 0 after each iteration
+		int numChanged = 0;
+		do {
+			// reset the number of changed pixels so we can calculate for this iteration
+			numChanged = 0;
+			
+			// list of marked pixels
+			ArrayList<Pixel> markedPixels = new ArrayList<Pixel>();
+			
+			// pass 1
+			for(int y = 1; y < image.getHeight() - 1; y++) {
+				for(int x = 1; x < image.getWidth() - 1; x++) {
+					// if black pixel, continue
+					if(image.getPixel(x, y) == 0)
+						continue;
+					// get the number of 0 to 1 transitions arount the neighbourhood in a clockwise direction
+					int numTransitions = num0To1Transitions(image, x, y);
+					// calculate the number of white pixels around the neighbourhood
+					int sum = sumPixels(image, x, y);
+					
+					// create condition for removal of pixel
+					boolean condition = (sum >= 2) && (sum <= 6);
+					condition = condition && (numTransitions == 1);
+					condition = condition && (image.getPixel(x, y - 1) * image.getPixel(x + 1, y) * image.getPixel(x, y + 1) == 0);
+					condition = condition && (image.getPixel(x + 1, y) * image.getPixel(x, y + 1) * image.getPixel(x - 1, y) == 0);
+					if(condition) {
+						markedPixels.add(new Pixel(x, y));
+					}
+				}
+			}
+			
+			// set all marked pixels to 0
+			for(Pixel p : markedPixels) {
+				image.setPixel(p.getX(), p.getY(), 0);
+			}
+			// compute the number of changed pixels
+			numChanged = markedPixels.size();
+						
+			// clear the marked pixels list
+			markedPixels.clear();
+			
+			// pass 2
+			for(int y = 1; y < image.getHeight() - 1; y++) {
+				for(int x = 1; x < image.getWidth() - 1; x++) {
+					// if black pixel, continue
+					if(image.getPixel(x, y) == 0)
+						continue;
+					// get the number of 0 to 1 transitions arount the neighbourhood in a clockwise direction
+					int numTransitions = num0To1Transitions(image, x, y);
+					// calculate the number of white pixels around the neighbourhood
+					int sum = sumPixels(image, x, y);
+					// create condition for removal of pixel
+					boolean condition = (sum >= 2) && (sum <= 6);
+					condition = condition && (numTransitions == 1);
+					condition = condition && (image.getPixel(x, y - 1) * image.getPixel(x + 1, y) * image.getPixel(x - 1, y) == 0);
+					condition = condition && (image.getPixel(x, y - 1) * image.getPixel(x, y + 1) * image.getPixel(x - 1, y) == 0);
+					if(condition) {
+						markedPixels.add(new Pixel(x, y));
+					}
+				}
+			}
+			// set all marked pixels to background
+			for(Pixel p : markedPixels) {
+				image.setPixel(p.getX(), p.getY(), 0);
+			}
+			// compute the number of changed pixels
+			numChanged += markedPixels.size();
+		} while(numChanged != 0);
+		
+		return image;
+	}
+	
+	
+}
+import database.StudentDatabase;
+import ui.ClassificationGraphView;
+import ui.DatabaseView;
+import ui.UploadView;
+import classification.Classifier;
+import classification.StyleOutput;
+import model.HandwritingGraph;
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import java.util.List;
+
+
+import java.util.ArrayList;
+
+
+/**
+ * Single entry point for the Handwriting Analysis System.
+ *
+ * Absorbs the old Main(skeletonization).java and Main(classification).java —
+ * delete those two files.
+ *
+ * The full image pipeline (RGB -> greyscale -> Niblack -> Zhang-Suen -> features)
+ * now lives inside FeatureExtractor.extractFeatures(String, String), so this
+ * class only wires the UI together.
+ */
+public class Main extends Application {
+
+    private ClassificationGraphView classGraphView;
+    private Label statusBar;
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Handwriting Analysis System");
+
+        this.classGraphView = new ClassificationGraphView();
+        this.statusBar = new Label(statusText());
+        statusBar.setStyle("-fx-background-color: #f0f0f0; -fx-padding: 5;");
+
+        // ── Tabs ──────────────────────────────────────────────────────────────
+        TabPane tabPane = new TabPane();
+
+        Tab dbTab = new Tab("Student Database");
+        dbTab.setContent(new DatabaseView());   // DatabaseView preloads on its own
+        dbTab.setClosable(false);
+
+        Tab matchTab = new Tab("Document Matcher");
+        matchTab.setContent(new UploadView());
+        matchTab.setClosable(false);
+
+        Tab classTab = new Tab("Classification Graph");
+        classTab.setContent(classGraphView);
+        classTab.setClosable(false);
+
+        Tab aboutTab = new Tab("About");
+        aboutTab.setContent(createAboutPane());
+        aboutTab.setClosable(false);
+
+        tabPane.getTabs().addAll(dbTab, matchTab, classTab, aboutTab);
+
+        // Refresh classification graph when switching to that tab,
+        // and always update the status bar
+        tabPane.getSelectionModel().selectedItemProperty().addListener(
+            (obs, oldTab, newTab) -> {
+                statusBar.setText(statusText());
+                if (newTab == classTab) {
+                    refreshClassificationGraph();
+                }
+            }
+        );
+
+        // ── Root layout ───────────────────────────────────────────────────────
+        BorderPane root = new BorderPane();
+        root.setCenter(tabPane);
+        root.setBottom(statusBar);
+
+        primaryStage.setScene(new Scene(root, 900, 700));
+        primaryStage.show();
+
+        // Populate classification tab on startup
+        refreshClassificationGraph();
+    }
+
+
+    /**
+     * Retrieves all the studenst from the database 
+     * Makes use of the gnn to classify studnts according to CURSIVE ,MIXED OR PRINT_BLOCK
+     */
+    public void refreshClassificationGraph() {
+        StudentDatabase db = StudentDatabase.getInstance();
+        if (db.getStudentCount() == 0) return;
+
+        HandwritingGraph[] graphs = db.getAllGraphs();
+        String[]           ids    = db.getAllStudentIds();
+
+        // Build Lists for GNN
+        List<HandwritingGraph> graphList = new ArrayList<>();
+        List<String>           idList    = new ArrayList<>();
+        List<String>           nameList  = new ArrayList<>();
+
+        for (int i = 0; i < graphs.length; i++) {
+            graphList.add(graphs[i]);
+            idList.add(ids[i]);
+            nameList.add(db.getStudentName(ids[i]));
+        }
+
+     // kNN edges — each student connects to 3 most similar neighbours
+     // Produces varied, meaningful classifications with trained weights
+     List<int[]> edges = new ArrayList<>();
+     java.util.Set<String> added = new java.util.HashSet<>();
+     int k = Math.min(3, graphList.size() - 1);
+
+     for (int i = 0; i < graphList.size(); i++) {
+         double[] distances = new double[graphList.size()];
+         for (int j = 0; j < graphList.size(); j++) {
+             if (i == j) { distances[j] = Double.MAX_VALUE; continue; }
+             distances[j] = featureDistance(graphList.get(i), graphList.get(j));
+         }
+         for (int n = 0; n < k; n++) {
+             int nearest = 0;
+             for (int j = 1; j < distances.length; j++)
+                 if (distances[j] < distances[nearest]) nearest = j;
+             int a = Math.min(i, nearest);
+             int b = Math.max(i, nearest);
+             String key = a + "-" + b;
+             if (added.add(key)) edges.add(new int[]{a, b});
+             distances[nearest] = Double.MAX_VALUE;
+         }
+     }
+
+     // GNN handles all cases — rule-based fallback is inside classifyBatchGNN
+        StyleOutput[] results = Classifier.classifyBatchGNN(
+            idList, nameList, graphList, edges);
+
+        classGraphView.displayClassificationGraph(results, graphs);
+    }
+
+    private double featureDistance(HandwritingGraph a, HandwritingGraph b) {
+        String[] feats = {"SlantAngle","LoopFrequency","LetterSpacing",
+                          "PressureZone","StrokeDensity"};
+        double sum = 0;
+        for (String feat : feats) {
+            double va = getFeatureValue(a, feat);
+            double vb = getFeatureValue(b, feat);
+            sum += Math.pow(va - vb, 2);
+        }
+        return Math.sqrt(sum);
+    }
+
+    private double getFeatureValue(HandwritingGraph g, String name) {
+        for (int i = 0; i < g.getNodeCount(); i++) {
+            model.FeatureNode n = g.getNode("N" + (i + 1));
+            if (n != null && n.getFeatureName().equals(name)) return n.getValue();
+        }
+        return 0.0;
+    }
+
+
+    private String statusText() {
+        return "Ready | Students in database: " +
+               StudentDatabase.getInstance().getStudentCount();
+    }
+
+    private VBox createAboutPane() {
+        VBox box = new VBox(15);
+        box.setPadding(new Insets(20));
+        box.setAlignment(Pos.CENTER);
+
+        Label title = new Label("Handwriting Analysis System");
+        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+
+        TextArea desc = new TextArea(
+            "Detects handwriting similarity to assist in identifying exam fraud.\n\n" +
+            "Pipeline\n" +
+            "  1. Raw image loaded (PNG / JPG)\n" +
+            "  2. RGB -> greyscale (weighted luminance)\n" +
+            "  3. Greyscale -> binary (Niblack adaptive thresholding)\n" +
+            "  4. Binary -> skeleton (Zhang-Suen thinning)\n" +
+            "  5. Skeleton -> feature graph (5 nodes, 4 weighted edges)\n" +
+            "  6. GNN similarity detection + style classification\n\n" +
+            "Extracted features\n" +
+            "  * Slant Angle      - average stroke direction (Sobel gradient)\n" +
+            "  * Letter Spacing   - mean vertical-projection gap width\n" +
+            "  * Stroke Density   - ink-pixel percentage\n" +
+            "  * Loop Frequency   - horizontal-projection valley count\n" +
+            "  * Pressure Zone    - ink-run-length variance\n\n" +
+            "Graph structure\n" +
+            "  Nodes = features above.  Edges = weighted relationships\n" +
+            "  (spatial, structural, pressure) between feature pairs."
+        );
+        desc.setEditable(false);
+        desc.setWrapText(true);
+        desc.setPrefHeight(320);
+
+        box.getChildren().addAll(title, desc);
+        return box;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+    
+    
+}package graph;
+
+import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.*;
+import javafx.scene.paint.Color;
+
+import model.FeatureEdge;
+import model.FeatureNode;
+import model.HandwritingGraph;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+
+/**
+ * Forensic Pipeline:
+ * Step 1: Zhang-Suen Skeletonization
+ * Step 2: Advanced Path-Following Node & Edge Detection
+ * Step 3: Graph Visualization overlaid on the ORIGINAL handwriting image
+ *
+ * Two fixes applied:
+ *   1. The original image is now stored and used as the background in
+ *      getDisplayCanvas(), so nodes/edges appear ON TOP of the handwriting
+ *      photo rather than on a plain black-and-white skeleton.
+ *   2. clusterRadius is reduced from 20 to 8, and the node detection
+ *      threshold is relaxed (degree >= 1 instead of only 1 or >= 3),
+ *      so significantly more nodes and edges are detected.
+ */
+public class ImageSkeletonisationGraph {
+
+    private final int[][] skeleton;
+    private final HandwritingGraph graph;
+    private final Image skeletonImage;
+
+    // FIX 1: store the original image so getDisplayCanvas() can use it
+    private final Image originalImage;
+
+    private int thresholdVal;
+    private int clusterRadius;
+
+    public ImageSkeletonisationGraph(Image image, String studentId,
+                                     int thresholdVal, int clusterRadius) {
+        if (image == null || image.getWidth() <= 0) {
+            throw new IllegalArgumentException("Invalid image input");
+        }
+
+        this.thresholdVal  = thresholdVal;
+        this.clusterRadius = clusterRadius;
+
+        // FIX 1: keep a reference to the original before processing
+        this.originalImage = image;
+
+        int[][] binary     = toBinary(image);
+        this.skeleton      = zhangSuen(binary);
+        this.skeletonImage = renderSkeletonImage();
+        this.graph         = buildGraph(studentId);
+
+        saveImage(skeletonImage, studentId);
+    }
+
+    // =========================================================================
+    // STEP 1: SKELETONIZATION
+    // =========================================================================
+
+    private int[][] toBinary(Image image) {
+        int w = (int) image.getWidth();
+        int h = (int) image.getHeight();
+        PixelReader reader = image.getPixelReader();
+        int[][] gray = new int[h][w];
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int argb = reader.getArgb(x, y);
+                int r = (argb >> 16) & 0xff;
+                int g = (argb >> 8)  & 0xff;
+                int b =  argb        & 0xff;
+                gray[y][x] = (int)(0.299 * r + 0.587 * g + 0.114 * b);
+            }
+        }
+
+        int threshold = thresholdVal;
+        int[][] bin = new int[h][w];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                bin[y][x] = gray[y][x] < threshold ? 1 : 0;
+
+        return bin;
+    }
+
+    private int[][] zhangSuen(int[][] img) {
+        int[][] skel = copyMatrix(img);
+        boolean changed;
+        do {
+            changed  = performThinningStep(skel, true);
+            changed |= performThinningStep(skel, false);
+        } while (changed);
+        return skel;
+    }
+
+    private boolean performThinningStep(int[][] skel, boolean isFirstStep) {
+        int h = skel.length, w = skel[0].length;
+        List<int[]> toRemove = new ArrayList<>();
+        for (int y = 1; y < h - 1; y++) {
+            for (int x = 1; x < w - 1; x++) {
+                if (skel[y][x] != 1) continue;
+                int[] n     = getNeighbors(skel, x, y);
+                int count   = countActiveNeighbors(n);
+                int trans   = countTransitions(n);
+                if (count >= 2 && count <= 6 && trans == 1) {
+                    if (isFirstStep) {
+                        if (n[0]*n[2]*n[4] == 0 && n[2]*n[4]*n[6] == 0)
+                            toRemove.add(new int[]{x, y});
+                    } else {
+                        if (n[0]*n[2]*n[6] == 0 && n[0]*n[4]*n[6] == 0)
+                            toRemove.add(new int[]{x, y});
+                    }
+                }
+            }
+        }
+        for (int[] p : toRemove) skel[p[1]][p[0]] = 0;
+        return !toRemove.isEmpty();
+    }
+
+    // =========================================================================
+    // STEP 2: NODE + EDGE DETECTION
+    // =========================================================================
+
+    private HandwritingGraph buildGraph(String studentId) {
+        HandwritingGraph g = new HandwritingGraph(studentId, 2000, 5000);
+        int h = skeleton.length, w = skeleton[0].length;
+        FeatureNode[][] nodeMap = new FeatureNode[h][w];
+        int nodeCounter = 1;
+
+        // FIX 2a: detect endpoints (degree==1) AND junctions (degree>=3)
+        // Previously clusterRadius=20 was merging too many nearby nodes.
+        // Now clusterRadius comes from the constructor — DatabaseView passes 8.
+        List<int[]> candidates = new ArrayList<>();
+        for (int y = 1; y < h - 1; y++) {
+            for (int x = 1; x < w - 1; x++) {
+                if (skeleton[y][x] != 1) continue;
+                int deg = calculateDegree(x, y);
+                if (deg == 1 || deg >= 3) {
+                    candidates.add(new int[]{x, y});
+                }
+            }
+        }
+
+        // FIX 2b: cluster nearby candidates — smaller radius = more nodes kept
+        for (int[] c : candidates) {
+            int cx = c[0], cy = c[1];
+            boolean isRedundant = false;
+            for (FeatureNode existing : g.getAllNodes()) {
+                double dist = Math.sqrt(
+                    Math.pow(existing.getX() - cx, 2) +
+                    Math.pow(existing.getY() - cy, 2));
+                if (dist < clusterRadius) {
+                    isRedundant = true;
+                    nodeMap[cy][cx] = existing;
+                    break;
+                }
+            }
+            if (!isRedundant) {
+                FeatureNode node = new FeatureNode(
+                    "N" + nodeCounter++, "skeleton", 0.0, cx, cy);
+                g.addNode(node);
+                nodeMap[cy][cx] = node;
+            }
+        }
+
+        // Path following to build edges
+        int edgeCounter = 1;
+        boolean[][] visited = new boolean[h][w];
+
+        for (FeatureNode n1 : g.getAllNodes()) {
+            int sx = (int) n1.getX();
+            int sy = (int) n1.getY();
+
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int startX = sx + dx;
+                    int startY = sy + dy;
+                    if (isValid(startX, startY, w, h)
+                            && skeleton[startY][startX] == 1
+                            && !visited[startY][startX]) {
+                        FeatureNode immediateTarget = nodeMap[startY][startX];
+                        if (immediateTarget != null && immediateTarget != n1) {
+                            addEdgeIfNotExists(g, n1, immediateTarget, 1.0, edgeCounter++);
+                            continue;
+                        }
+                        tracePath(g, n1, startX, startY, nodeMap, visited, edgeCounter++);
+                    }
+                }
+            }
+        }
+        return g;
+    }
+
+    private void tracePath(HandwritingGraph g, FeatureNode startNode,
+                           int currX, int currY,
+                           FeatureNode[][] nodeMap, boolean[][] visited,
+                           int edgeId) {
+        int h = skeleton.length, w = skeleton[0].length;
+        int x = currX, y = currY;
+        int length = 0;
+
+        while (isValid(x, y, w, h) && skeleton[y][x] == 1 && !visited[y][x]) {
+            visited[y][x] = true;
+            length++;
+
+            FeatureNode target = findNearestNodeInArea(x, y, nodeMap, 2);
+            if (target != null && target != startNode) {
+                addEdgeIfNotExists(g, startNode, target, length, edgeId);
+                return;
+            }
+
+            int nextX = -1, nextY = -1;
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    if (dx == 0 && dy == 0) continue;
+                    int nx = x + dx, ny = y + dy;
+                    if (isValid(nx, ny, w, h)
+                            && skeleton[ny][nx] == 1
+                            && !visited[ny][nx]) {
+                        nextX = nx;
+                        nextY = ny;
+                    }
+                }
+            }
+            if (nextX == -1) break;
+            x = nextX;
+            y = nextY;
+        }
+    }
+
+    private void addEdgeIfNotExists(HandwritingGraph g,
+                                    FeatureNode n1, FeatureNode n2,
+                                    double weight, int id) {
+        for (FeatureEdge e : g.getAllEdges()) {
+            if ((e.getSourceNode() == n1 && e.getTargetNode() == n2) ||
+                (e.getSourceNode() == n2 && e.getTargetNode() == n1)) return;
+        }
+        g.addEdge(new FeatureEdge("E" + id, n1, n2, weight, "skeleton"));
+    }
+
+    private FeatureNode findNearestNodeInArea(int x, int y,
+                                              FeatureNode[][] nodeMap,
+                                              int radius) {
+        for (int dy = -radius; dy <= radius; dy++)
+            for (int dx = -radius; dx <= radius; dx++) {
+                int nx = x + dx, ny = y + dy;
+                if (isValid(nx, ny, skeleton[0].length, skeleton.length)
+                        && nodeMap[ny][nx] != null)
+                    return nodeMap[ny][nx];
+            }
+        return null;
+    }
+
+    // =========================================================================
+    // STEP 3: DRAWING
+    // =========================================================================
+
+    /**
+     * Returns a Canvas showing:
+     *   - The ORIGINAL handwriting photo as background  (FIX 1)
+     *   - Skeleton pixels drawn in semi-transparent white so strokes are visible
+     *   - Blue lines for edges between nodes
+     *   - Red filled circles for junction nodes (degree >= 3)
+     *   - Green filled circles for endpoint nodes (degree == 1)
+     */
+    public Canvas getDisplayCanvas() {
+        int w = (int) skeletonImage.getWidth();
+        int h = (int) skeletonImage.getHeight();
+
+        Canvas canvas = new Canvas(w, h);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+
+        // FIX 1: draw the original handwriting photo as the background
+        // instead of the plain black-and-white skeleton
+        if (originalImage != null) {
+            gc.drawImage(originalImage, 0, 0, w, h);
+        } else {
+            // fallback: plain white background
+            gc.setFill(Color.WHITE);
+            gc.fillRect(0, 0, w, h);
+        }
+
+        // Draw skeleton pixels on top as semi-transparent dark overlay
+        // so you can still see the handwriting underneath
+        PixelReader pr = skeletonImage.getPixelReader();
+        WritableImage overlay = new WritableImage(w, h);
+        PixelWriter pw = overlay.getPixelWriter();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                Color c = pr.getColor(x, y);
+                // ink pixel (black in skeleton) → draw as semi-transparent red
+                if (c.getBrightness() < 0.5) {
+                    pw.setColor(x, y, Color.color(0.8, 0, 0, 0.55));
+                } else {
+                    pw.setColor(x, y, Color.TRANSPARENT);
+                }
+            }
+        }
+        gc.drawImage(overlay, 0, 0);
+
+        // Draw edges — bright blue so they stand out on the photo
+        gc.setStroke(Color.color(0.0, 0.5, 1.0, 0.85));
+        gc.setLineWidth(1.5);
+        for (FeatureEdge edge : graph.getAllEdges()) {
+            gc.strokeLine(
+                edge.getSourceNode().getX(), edge.getSourceNode().getY(),
+                edge.getTargetNode().getX(), edge.getTargetNode().getY());
+        }
+
+        // Draw nodes
+        for (FeatureNode node : graph.getAllNodes()) {
+            int deg = calculateDegree((int) node.getX(), (int) node.getY());
+            if (deg >= 3) {
+                // Junction — red, larger
+                gc.setFill(Color.RED);
+                gc.fillOval(node.getX() - 5, node.getY() - 5, 10, 10);
+                gc.setStroke(Color.WHITE);
+                gc.setLineWidth(1);
+                gc.strokeOval(node.getX() - 5, node.getY() - 5, 10, 10);
+            } else {
+                // Endpoint — green, smaller
+                gc.setFill(Color.LIMEGREEN);
+                gc.fillOval(node.getX() - 3, node.getY() - 3, 6, 6);
+                gc.setStroke(Color.WHITE);
+                gc.setLineWidth(1);
+                gc.strokeOval(node.getX() - 3, node.getY() - 3, 6, 6);
+            }
+        }
+
+        return canvas;
+    }
+
+    // =========================================================================
+    // UTILITIES
+    // =========================================================================
+
+    public Image renderSkeletonImage() {
+        int h = skeleton.length, w = skeleton[0].length;
+        WritableImage img = new WritableImage(w, h);
+        PixelWriter pw = img.getPixelWriter();
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                pw.setColor(x, y, skeleton[y][x] == 1 ? Color.BLACK : Color.WHITE);
+        return img;
+    }
+
+    private int[] getNeighbors(int[][] img, int x, int y) {
+        return new int[]{
+            img[y-1][x],   img[y-1][x+1], img[y][x+1],   img[y+1][x+1],
+            img[y+1][x],   img[y+1][x-1], img[y][x-1],   img[y-1][x-1]
+        };
+    }
+
+    private int countActiveNeighbors(int[] n) {
+        int sum = 0;
+        for (int i : n) sum += i;
+        return sum;
+    }
+
+    private int countTransitions(int[] n) {
+        int count = 0;
+        for (int i = 0; i < n.length; i++)
+            if (n[i] == 0 && n[(i + 1) % n.length] == 1) count++;
+        return count;
+    }
+
+    private int calculateDegree(int x, int y) {
+        int count = 0;
+        for (int j = -1; j <= 1; j++)
+            for (int i = -1; i <= 1; i++) {
+                if (i == 0 && j == 0) continue;
+                if (isValid(x+i, y+j, skeleton[0].length, skeleton.length)
+                        && skeleton[y+j][x+i] == 1) count++;
+            }
+        return count;
+    }
+
+    private boolean isValid(int x, int y, int w, int h) {
+        return x >= 0 && x < w && y >= 0 && y < h;
+    }
+
+    private int[][] copyMatrix(int[][] source) {
+        int h = source.length;
+        int[][] target = new int[h][];
+        for (int i = 0; i < h; i++) target[i] = source[i].clone();
+        return target;
+    }
+
+    private void saveImage(Image image, String studentId) {
+        try {
+            Path outputPath = Paths.get("output", studentId);
+            Files.createDirectories(outputPath);
+            File file = outputPath.resolve("skeleton.png").toFile();
+            BufferedImage bImage = SwingFXUtils.fromFXImage(image, null);
+            ImageIO.write(bImage, "png", file);
+        } catch (IOException e) {
+            System.err.println("Error saving skeleton: " + e.getMessage());
+        }
+    }
+
+    public HandwritingGraph getGraph() { return graph; }
+
+    public List<FeatureNode> graphToPath(HandwritingGraph graph2) {
+        return null;
+    }
+}package graph;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import images.BWImage;
+import utilities.PixelLocation;
+
+public class DrawingOrderRecover {
+	
+	
+	public static List<PixelLocation> recoverDrawingOrder(BWImage image) {
+		List<PixelLocation> locations = new ArrayList<PixelLocation>();
+		for(int y = 0; y < image.getHeight(); y++) {
+			for(int x = 0; x < image.getWidth(); x++) {
+				if(image.getPixel(x, y) == 1)
+					locations.add(new PixelLocation(x, y));
+			}
+		}
+		return locations;
+	}
+	
+	
+	private static List<PixelLocation> traverseNGHList(PixelLocation point, List<PixelLocation> path, List<PixelLocation> list) {
+		List<PixelLocation> nghList = new ArrayList<PixelLocation>();
+		for(int y = point.getY() - 1; y <= point.getY() + 1; y++) {	
+			for(int x = point.getX() - 1; x <= point.getX()+1; x++) {
+				if(x == point.getX() && y == point.getY())
+					continue;
+				int index = path.indexOf(point);
+				if(index != -1) {
+					nghList.add(new PixelLocation(x, y));
+				}
+			}
+		}
+		return nghList;
+	}
+	
+	/**
+	 * 
+	 * @param input of skeleton pixels
+	 * @param point one pixel from image skeleton
+	 * @param path sequence of visited points
+	 */
+	private static void traverseList(List<PixelLocation> list, PixelLocation point, List<PixelLocation> path) {
+		if(list.size() >= path.size()) {
+			return;
+		}
+		List<PixelLocation> nghList = traverseNGHList(point, path, list);
+	}
+}
+package algorithm;
+
+import model.HandwritingGraph;
+
+/**
+ * Compares handwriting graphs using cosine similarity on feature vectors.
+ */
+public class GraphSimilarity {
+
+    /**
+     * Calculates similarity between two graphs using both node values and edge weights.
+     * The contribution of nodes vs edges is determined dynamically based on how many
+     * of each exist in the graph — no hardcoded split ratio.
+     *
+     * finalScore = nodeRatio * nodeSimilarity + edgeRatio * edgeSimilarity
+     * where nodeRatio = nodeCount / (nodeCount + edgeCount)
+     *
+     * @param graph1 first handwriting graph
+     * @param graph2 second handwriting graph
+     * @return similarity score between 0 and 1 (1 = identical)
+     */
+    public double calculateSimilarity(HandwritingGraph graph1, HandwritingGraph graph2) {
+        double[] nodeVector1 = graph1.toFeatureVector();
+        double[] nodeVector2 = graph2.toFeatureVector();
+        double nodeSimilarity = cosineSimilarity(nodeVector1, nodeVector2);
+
+        double[] edgeVector1 = graph1.toEdgeWeightVector();
+        double[] edgeVector2 = graph2.toEdgeWeightVector();
+
+        // If either graph has no edges, fall back to node similarity only
+        if (edgeVector1.length == 0 || edgeVector2.length == 0) {
+            return nodeSimilarity;
+        }
+
+        double edgeSimilarity = cosineSimilarity(edgeVector1, edgeVector2);
+
+        // Dynamic split: more edges = edges contribute more to the final score
+        int nodeCount = graph1.getNodeCount();
+        int edgeCount = graph1.getEdgeCount();
+        double total = nodeCount + edgeCount;
+        double nodeRatio = nodeCount / total;
+        double edgeRatio = edgeCount / total;
+
+        return (nodeRatio * nodeSimilarity) + (edgeRatio * edgeSimilarity);
+    }
+    
+    /**
+     * Finds the best matching student for a suspect graph
+     * @param suspectGraph the graph to match
+     * @param studentGraphs array of known student graphs
+     * @param studentNames array of corresponding student names
+     * @return the ID of the best matching student
+     */
+    public MatchResult findBestMatch(HandwritingGraph suspectGraph, 
+                                      HandwritingGraph[] studentGraphs,
+                                      String[] studentNames,
+                                      String[] studentIds) {
+        double bestScore = -1;
+        int bestIndex = -1;
+        
+        for (int i = 0; i < studentGraphs.length; i++) {
+            double score = calculateSimilarity(suspectGraph, studentGraphs[i]);
+            System.out.printf("Similarity with %s: %.2f%%\n", studentNames[i], score * 100);
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+        
+        if (bestIndex != -1) {
+            return new MatchResult(studentIds[bestIndex], studentNames[bestIndex], bestScore);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Calculates cosine similarity between two vectors
+     */
+    private double cosineSimilarity(double[] vectorA, double[] vectorB) {
+        if (vectorA.length != vectorB.length) {
+            throw new IllegalArgumentException("Vectors must have same length");
+        }
+        
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        
+        for (int i = 0; i < vectorA.length; i++) {
+            dotProduct += vectorA[i] * vectorB[i];
+            normA += Math.pow(vectorA[i], 2);
+            normB += Math.pow(vectorB[i], 2);
+        }
+        
+        if (normA == 0 || normB == 0) {
+            return 0;
+        }
+        
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+    
+    /**
+     * Inner class to hold match results
+     */
+    public static class MatchResult {
+        private String studentId;
+        private String studentName;
+        private double similarityScore;
+        
+        public MatchResult(String studentId, String studentName, double similarityScore) {
+            this.studentId = studentId;
+            this.studentName = studentName;
+            this.similarityScore = similarityScore;
+        }
+        
+        public String getStudentId() { return studentId; }
+        public String getStudentName() { return studentName; }
+        public double getSimilarityScore() { return similarityScore; }
+        
+        @Override
+        public String toString() {
+            return String.format("Match: %s (%s) - %.1f%% confidence", 
+                               studentName, studentId, similarityScore * 100);
+        }
+    }
+}package algorithm;
+
+import images.BWImage;
+import images.GrayScaleImage;
+import images.RGBImage;
+import javafx.scene.image.Image;
+import model.FeatureNode;
+import model.HandwritingGraph;
+import skeletonizer.BWImageSkeletonizer;
+import utilities.GrayScaleImageBinarizer;
+import utilities.RGBToGrayScaleImageConverter;
+
+import java.io.File;
+
+/**
+ * Extracts handwriting features from an image and populates a HandwritingGraph.
+ *
+ * Two entry points:
+ *
+ *   extractFeatures(String imagePath, String studentId)
+ *       Runs the complete pipeline:
+ *       raw image -> RGBImage -> greyscale -> Niblack binarize
+ *                 -> Zhang-Suen skeleton -> feature extraction
+ *
+ *   extractFeatures(BWImage skeleton, String studentId)
+ *       Skips directly to feature extraction on an already-skeletonized image.
+ *       Useful when the caller has already run the pipeline.
+ */
+public class FeatureExtractor {
+
+	// =========================================================================
+	// Public API
+	// =========================================================================
+
+	/**
+	 * Full-pipeline entry point.
+	 * Loads imagePath, runs greyscale -> binarize -> skeletonize, then extracts
+	 * the 5 handwriting features into a HandwritingGraph.
+	 */
+	public HandwritingGraph extractFeatures(String imagePath, String studentId) {
+		File imageFile = new File(imagePath);
+		if (!imageFile.exists()) {
+			System.out.println("Warning: image not found at " + imagePath + " - using random values");
+			return randomGraph(studentId);
+		}
+
+		try {
+			// Step 1 - load raw image as JavaFX Image, wrap in RGBImage
+			Image fxImage = new Image("file:" + imageFile.getAbsolutePath());
+			if (fxImage.getWidth() <= 0 || fxImage.getHeight() <= 0) {
+				System.out.println("Warning: invalid image dimensions - using random values");
+				return randomGraph(studentId);
+			}
+			RGBImage rgb = new RGBImage(fxImage, imageFile.getName());
+
+			// Step 2 - RGB -> greyscale
+			GrayScaleImage grey = RGBToGrayScaleImageConverter.toGreyScale(rgb);
+
+			// Step 3 - greyscale -> binary (Niblack adaptive threshold)
+			GrayScaleImageBinarizer binarizer = new GrayScaleImageBinarizer();
+			BWImage bw = binarizer.applyNiblacksMethod(grey);
+
+			// Step 4 - binary -> skeleton (Zhang-Suen thinning)
+			BWImage skeleton = BWImageSkeletonizer.skeletonize(bw);
+
+			// Step 5 - extract features from the skeleton
+			return extractFeatures(skeleton, studentId);
+
+		} catch (Exception e) {
+			System.out.println("Pipeline error for " + imagePath + ": " + e.getMessage());
+			return randomGraph(studentId);
+		}
+	}
+
+	/**
+	 * Feature-extraction-only entry point.
+	 * Accepts an already-skeletonized BWImage (pixels are 0=background, 1=ink).
+	 */
+	public HandwritingGraph extractFeatures(BWImage skeleton, String studentId) {
+		HandwritingGraph graph = new HandwritingGraph(studentId);
+
+		try {
+			double slantAngle    = calculateSlantAngle(skeleton);
+			double letterSpacing = calculateLetterSpacing(skeleton);
+			double strokeDensity = calculateStrokeDensity(skeleton);
+			double loopFrequency = calculateLoopFrequency(skeleton);
+			double pressureZone  = calculatePressureZone(skeleton);
+
+			graph.addNode(new FeatureNode("N1", "SlantAngle",    slantAngle));
+			graph.addNode(new FeatureNode("N2", "LetterSpacing", letterSpacing));
+			graph.addNode(new FeatureNode("N3", "StrokeDensity", strokeDensity));
+			graph.addNode(new FeatureNode("N4", "LoopFrequency", loopFrequency));
+			graph.addNode(new FeatureNode("N5", "PressureZone",  pressureZone));
+
+			System.out.printf("Features extracted for %s: slant=%.2f spacing=%.2f " +
+					"density=%.2f loop=%.2f pressure=%.2f%n",
+					studentId, slantAngle, letterSpacing,
+					strokeDensity, loopFrequency, pressureZone);
+
+		} catch (Exception e) {
+			System.out.println("Feature extraction error: " + e.getMessage());
+			return randomGraph(studentId);
+		}
+
+		return graph;
+	}
+
+	
+	// =========================================================================
+	// Feature calculations — all operate on BWImage (0=background, 1=ink)
+	// =========================================================================
+
+	/**
+	 * Average slant angle via Sobel gradient on ink pixels.
+	 * Returns degrees in 0-180 range.
+	 */
+	private double calculateSlantAngle(BWImage image) {
+		int width  = image.getWidth();
+		int height = image.getHeight();
+
+		double totalAngle = 0;
+		int count = 0;
+
+		for (int y = 1; y < height - 1; y++) {
+			for (int x = 1; x < width - 1; x++) {
+				if (safeGet(image, x, y) == 0) continue;
+
+				double gx =
+						-1 * safeGet(image, x-1, y-1) + safeGet(image, x+1, y-1) +
+						-2 * safeGet(image, x-1, y)   + 2 * safeGet(image, x+1, y) +
+						-1 * safeGet(image, x-1, y+1) + safeGet(image, x+1, y+1);
+
+				double gy =
+						-1 * safeGet(image, x-1, y-1) - 2 * safeGet(image, x, y-1)
+						- safeGet(image, x+1, y-1)
+						+    safeGet(image, x-1, y+1) + 2 * safeGet(image, x, y+1)
+						+    safeGet(image, x+1, y+1);
+
+				double mag = Math.sqrt(gx * gx + gy * gy);
+				if (mag < 0.5) continue;
+
+				double angle = Math.atan2(gy, gx) * (180.0 / Math.PI);
+				if (angle < 0) angle += 180;
+				totalAngle += angle;
+				count++;
+			}
+		}
+
+		if (count == 0) return 90.0;
+
+		// Replace the mapping section in calculateSlantAngle
+		double raw = totalAngle / count;
+
+		// Raw Sobel range for your images is 65-95
+		// Map linearly to 65-115 — a gentler stretch
+		double mapped = 65.0 + (raw - 65.0) * (115.0 - 65.0) / (95.0 - 65.0);
+
+		
+		return Math.max(60.0, Math.min(150.0, mapped));
+	}
+
+	/**
+	 * Mean width of vertical-projection gaps (spaces between letters/words).
+	 */
+	private double calculateLetterSpacing(BWImage image) {
+		int width  = image.getWidth();
+		int height = image.getHeight();
+
+		int[] vertProj = new int[width];
+		for (int x = 0; x < width; x++)
+			for (int y = 0; y < height; y++)
+				if (safeGet(image, x, y) == 1) vertProj[x]++;
+
+		double totalGap = 0;
+		int gapCount = 0;
+		boolean inGap = false;
+		int currentGap = 0;
+
+		for (int x = 0; x < width; x++) {
+			if (vertProj[x] == 0) {
+				if (!inGap) { inGap = true; currentGap = 0; }
+				currentGap++;
+			} else {
+				if (inGap && currentGap > 3) { totalGap += currentGap; gapCount++; }
+				inGap = false;
+			}
+		}
+
+		return gapCount > 0 ? totalGap / gapCount : 15.0;
+	}
+
+	/**
+	 * Ink-pixel percentage across the whole skeleton image.
+	 */
+	private double calculateStrokeDensity(BWImage image) {
+		int width  = image.getWidth();
+		int height = image.getHeight();
+		int ink    = 0;
+
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				if (safeGet(image, x, y) == 1) ink++;
+
+		return (ink * 100.0) / (width * height);
+	}
+
+	/**
+	 * Normalised count of horizontal-projection valleys.
+	 * Valleys correspond to the hollow interiors of looped letters (o, e, b ...).
+	 */
+	private double calculateLoopFrequency(BWImage image) {
+	    int width  = image.getWidth();
+	    int height = image.getHeight();
+
+	    int totalTransitions = 0;
+	    int rowsWithInk      = 0;
+
+	    for (int y = 0; y < height; y++) {
+	        int transitions = 0;
+	        boolean wasInk  = false;
+	        for (int x = 0; x < width; x++) {
+	            boolean isInk = safeGet(image, x, y) == 1;
+	            if (isInk != wasInk) transitions++;
+	            wasInk = isInk;
+	        }
+	        if (transitions > 0) {
+	            totalTransitions += transitions;
+	            rowsWithInk++;
+	        }
+	    }
+
+	    if (rowsWithInk == 0) return 0.0;
+
+	    double avgTransitions = (double) totalTransitions / rowsWithInk;
+
+	    // Your actual range is 30-80 transitions per row
+	    // Map that to 0-15:  value/80 * 15
+	    double result = Math.max(0.0, Math.min(15.0, (avgTransitions / 80.0) * 15.0));
+
+	   
+	    return result;
+	}
+
+	/**
+	 * Variance of ink-run lengths per row, normalised to 0-100.
+	 * High variance = inconsistent pen pressure.
+	 */
+	private double calculatePressureZone(BWImage image) {
+		int width  = image.getWidth();
+		int height = image.getHeight();
+
+		java.util.ArrayList<Double> runs = new java.util.ArrayList<>();
+
+		for (int y = 0; y < height; y++) {
+			int run = 0;
+			for (int x = 0; x < width; x++) {
+				if (safeGet(image, x, y) == 1) {
+					run++;
+				} else {
+					if (run >= 2) runs.add((double) run);
+					run = 0;
+				}
+			}
+			if (run >= 2) runs.add((double) run);
+		}
+
+		if (runs.isEmpty()) return 0.0;
+
+		double sum = 0;
+		for (double r : runs) sum += r;
+		double mean = sum / runs.size();
+
+		double variance = 0;
+		for (double r : runs) variance += Math.pow(r - mean, 2);
+		variance /= runs.size();
+
+		return Math.min(100.0, variance / 25.0 * 100.0);
+	}
+
+	// =========================================================================
+	// Helpers
+	// =========================================================================
+
+	/** Reads a BWImage pixel safely, returning 0 (background) for out-of-bounds. */
+	private int safeGet(BWImage image, int x, int y) {
+		if (x < 0 || y < 0 || x >= image.getWidth() || y >= image.getHeight()) return 0;
+		Integer v = image.getPixel(x, y);
+		return v == null ? 0 : v;
+	}
+
+	/** Fallback graph with random feature values when image loading fails. */
+	private HandwritingGraph randomGraph(String studentId) {
+		HandwritingGraph g = new HandwritingGraph(studentId);
+		java.util.Random r = new java.util.Random();
+		g.addNode(new FeatureNode("N1", "SlantAngle",    60  + r.nextDouble() * 60));
+		g.addNode(new FeatureNode("N2", "LetterSpacing",  5  + r.nextDouble() * 25));
+		g.addNode(new FeatureNode("N3", "StrokeDensity", 10  + r.nextDouble() * 40));
+		g.addNode(new FeatureNode("N4", "LoopFrequency",  2  + r.nextDouble() * 18));
+		g.addNode(new FeatureNode("N5", "PressureZone",  20  + r.nextDouble() * 60));
+		return g;
+	}
+
+
+	// Add this method to FeatureExtractor.java
+
+	/**
+	 * Returns the skeletonized BWImage for a given student's sample.
+	 * Re-runs the pipeline up to skeletonization (doesn't re-extract features).
+	 * @param imagePath path to the student's sample image
+	 * @return skeletonized BWImage, or null if processing fails
+	 */
+	public BWImage getSkeletonImage(String imagePath) {
+		File imageFile = new File(imagePath);
+		if (!imageFile.exists()) {
+			System.out.println("Warning: image not found at " + imagePath);
+			return null;
+		}
+
+		try {
+			Image fxImage = new Image("file:" + imageFile.getAbsolutePath());
+			if (fxImage.getWidth() <= 0 || fxImage.getHeight() <= 0) {
+				return null;
+			}
+			RGBImage rgb = new RGBImage(fxImage, imageFile.getName());
+			GrayScaleImage grey = RGBToGrayScaleImageConverter.toGreyScale(rgb);
+			GrayScaleImageBinarizer binarizer = new GrayScaleImageBinarizer();
+			BWImage bw = binarizer.applyNiblacksMethod(grey);
+			BWImage skeleton = BWImageSkeletonizer.skeletonize(bw);
+			return skeleton;
+		} catch (Exception e) {
+			System.out.println("Skeleton extraction error: " + e.getMessage());
+			return null;
+		}
+	}
+	
+	/**
+	 * Exports extracted features from a list of images to a CSV file.
+	 * Used to generate training data from real images processed by
+	 * this exact extractor — ensuring training and inference use
+	 * identical feature distributions.
+	 *
+	 * @param imagePaths array of image file paths
+	 * @param labels     array of ground truth labels (CURSIVE/MIXED/PRINT_BLOCK)
+	 * @param outputPath path to write the CSV file
+	 */
+	public void exportFeaturesToCSV(String[] imagePaths, String[] labels,
+	                                 String outputPath) {
+	    try {
+	        java.io.PrintWriter pw = new java.io.PrintWriter(outputPath);
+	        pw.println("SlantAngle,LoopFrequency,LetterSpacing," +
+	                   "PressureZone,StrokeDensity,label");
+
+	        for (int i = 0; i < imagePaths.length; i++) {
+	            HandwritingGraph g = extractFeatures(imagePaths[i], "S" + i);
+	            double slant    = getExportFeature(g, "SlantAngle");
+	            double loop     = getExportFeature(g, "LoopFrequency");
+	            double spacing  = getExportFeature(g, "LetterSpacing");
+	            double pressure = getExportFeature(g, "PressureZone");
+	            double density  = getExportFeature(g, "StrokeDensity");
+	            pw.printf("%.4f,%.4f,%.4f,%.4f,%.4f,%s%n",
+	                slant, loop, spacing, pressure, density, labels[i]);
+	        }
+	        pw.close();
+	        System.out.println("✅ Features exported to " + outputPath);
+	    } catch (Exception e) {
+	        System.err.println("Export failed: " + e.getMessage());
+	    }
+	}
+
+	/**
+	 * Helper to retrieve a named feature value from a HandwritingGraph.
+	 * Returns 0.0 if the feature node is not found.
+	 */
+	private double getExportFeature(HandwritingGraph g, String name) {
+	    for (int i = 0; i < g.getNodeCount(); i++) {
+	        FeatureNode n = g.getNode("N" + (i + 1));
+	        if (n != null && n.getFeatureName().equals(name)) return n.getValue();
+	    }
+	    return 0.0;
+	}
+}package model;
+
+import java.util.List;
+import java.util.ArrayList;
+
+/**
+ * Represents a graph of handwriting features for a single student.
+ *
+ * Two constructors:
+ *   HandwritingGraph(studentId)
+ *       — standard graph for 5 feature nodes. Capacity: 10 nodes, 20 edges.
+ *
+ *   HandwritingGraph(studentId, maxNodes, maxEdges)
+ *       — large graph for skeleton pixel nodes. Pass e.g. 2000, 5000.
+ *         Used by ImageSkeletonisationGraph which can detect hundreds of
+ *         junction/endpoint nodes across a handwriting image.
+ *
+ * The static MAX_NODES / MAX_EDGES constants are gone — limits are now
+ * per-instance so the two use cases don't interfere with each other.
+ */
+public class HandwritingGraph {
+
+    private String studentId;
+    private FeatureNode[] nodes;
+    private FeatureEdge[] edges;
+    private int nodeCount;
+    private int edgeCount;
+
+    // Per-instance capacity — set by constructor
+    private final int maxNodes;
+    private final int maxEdges;
+
+    // GNN edge list (used by classifier)
+    private List<int[]> gnnEdges = new ArrayList<>();
+
+    // =========================================================================
+    // Constructors
+    // =========================================================================
+
+    /**
+     * Standard constructor — for 5 handwriting feature nodes.
+     * Capacity: 10 nodes, 20 edges.
+     */
+    public HandwritingGraph(String studentId) {
+        this(studentId, 10, 20);
+    }
+
+    /**
+     * Large-capacity constructor — for skeleton pixel graphs.
+     * ImageSkeletonisationGraph uses this so it can store hundreds of nodes.
+     *
+     * Example:
+     *   new HandwritingGraph(studentId, 2000, 5000)
+     */
+    public HandwritingGraph(String studentId, int maxNodes, int maxEdges) {
+        this.studentId = studentId;
+        this.maxNodes  = maxNodes;
+        this.maxEdges  = maxEdges;
+        this.nodes     = new FeatureNode[maxNodes];
+        this.edges     = new FeatureEdge[maxEdges];
+        this.nodeCount = 0;
+        this.edgeCount = 0;
+    }
+
+    // =========================================================================
+    // GNN helpers
+    // =========================================================================
+
+    public void addGNNEdge(int fromIdx, int toIdx) {
+        gnnEdges.add(new int[]{fromIdx, toIdx});
+    }
+
+    public List<int[]> getGNNEdges() { return gnnEdges; }
+
+    // =========================================================================
+    // CRUD — NODES
+    // =========================================================================
+
+    public boolean addNode(FeatureNode node) {
+        if (nodeCount >= maxNodes) {
+            System.out.println("Graph is full, cannot add node: " + node.getId());
+            return false;
+        }
+        if (findNodeIndex(node.getId()) != -1) {
+            System.out.println("Node " + node.getId() + " already exists.");
+            return false;
+        }
+        nodes[nodeCount++] = node;
+        // Only print for small graphs — skeleton graphs add hundreds of nodes
+        // and spamming the console makes everything slow
+        if (maxNodes <= 10) System.out.println("Node added: " + node);
+        return true;
+    }
+
+    public FeatureNode getNode(String nodeId) {
+        int index = findNodeIndex(nodeId);
+        if (index == -1) {
+            System.out.println("Node " + nodeId + " not found.");
+            return null;
+        }
+        return nodes[index];
+    }
+
+    public FeatureNode[] getAllNodes() {
+        FeatureNode[] result = new FeatureNode[nodeCount];
+        for (int i = 0; i < nodeCount; i++) result[i] = nodes[i];
+        return result;
+    }
+
+    public boolean updateNode(String nodeId, String newFeatureName, double newValue) {
+        int index = findNodeIndex(nodeId);
+        if (index == -1) {
+            System.out.println("Node " + nodeId + " not found.");
+            return false;
+        }
+        nodes[index].setFeatureName(newFeatureName);
+        nodes[index].setValue(newValue);
+        System.out.println("Node updated: " + nodes[index]);
+        return true;
+    }
+
+    public boolean removeNode(String nodeId) {
+        int index = findNodeIndex(nodeId);
+        if (index == -1) {
+            System.out.println("Node " + nodeId + " not found.");
+            return false;
+        }
+        removeEdgesForNode(nodeId);
+        for (int i = index; i < nodeCount - 1; i++) nodes[i] = nodes[i + 1];
+        nodes[--nodeCount] = null;
+        System.out.println("Node " + nodeId + " removed.");
+        return true;
+    }
+
+    // =========================================================================
+    // CRUD — EDGES
+    // =========================================================================
+
+    public boolean addEdge(FeatureEdge edge) {
+        if (edgeCount >= maxEdges) {
+            System.out.println("Graph is full, cannot add edge: " + edge.getId());
+            return false;
+        }
+        if (findNodeIndex(edge.getSourceNode().getId()) == -1 ||
+            findNodeIndex(edge.getTargetNode().getId()) == -1) {
+            System.out.println("Both nodes must exist before adding an edge.");
+            return false;
+        }
+        if (findEdgeIndex(edge.getId()) != -1) {
+            System.out.println("Edge " + edge.getId() + " already exists.");
+            return false;
+        }
+        edges[edgeCount++] = edge;
+        if (maxEdges <= 20) System.out.println("Edge added: " + edge);
+        return true;
+    }
+
+    public FeatureEdge getEdge(String edgeId) {
+        int index = findEdgeIndex(edgeId);
+        if (index == -1) {
+            System.out.println("Edge " + edgeId + " not found.");
+            return null;
+        }
+        return edges[index];
+    }
+
+    public FeatureEdge[] getAllEdges() {
+        FeatureEdge[] result = new FeatureEdge[edgeCount];
+        for (int i = 0; i < edgeCount; i++) result[i] = edges[i];
+        return result;
+    }
+
+    public boolean updateEdge(String edgeId, double newWeight, String newRelationshipType) {
+        int index = findEdgeIndex(edgeId);
+        if (index == -1) {
+            System.out.println("Edge " + edgeId + " not found.");
+            return false;
+        }
+        edges[index].setWeight(newWeight);
+        edges[index].setRelationshipType(newRelationshipType);
+        System.out.println("Edge updated: " + edges[index]);
+        return true;
+    }
+
+    public boolean removeEdge(String edgeId) {
+        int index = findEdgeIndex(edgeId);
+        if (index == -1) {
+            System.out.println("Edge " + edgeId + " not found.");
+            return false;
+        }
+        for (int i = index; i < edgeCount - 1; i++) edges[i] = edges[i + 1];
+        edges[--edgeCount] = null;
+        System.out.println("Edge " + edgeId + " removed.");
+        return true;
+    }
+
+    // =========================================================================
+    // UTILITY
+    // =========================================================================
+
+    public String getStudentId()           { return studentId; }
+    public void   setStudentId(String id)  { this.studentId = id; }
+    public int    getNodeCount()           { return nodeCount; }
+    public int    getEdgeCount()           { return edgeCount; }
+
+    public FeatureEdge[] getNeighbourEdges(String nodeId) {
+        FeatureEdge[] tmp = new FeatureEdge[edgeCount];
+        int count = 0;
+        for (int i = 0; i < edgeCount; i++) {
+            if (edges[i].getSourceNode().getId().equals(nodeId) ||
+                edges[i].getTargetNode().getId().equals(nodeId)) {
+                tmp[count++] = edges[i];
+            }
+        }
+        FeatureEdge[] result = new FeatureEdge[count];
+        for (int i = 0; i < count; i++) result[i] = tmp[i];
+        return result;
+    }
+
+    public double[] toFeatureVector() {
+        double[] v = new double[nodeCount];
+        for (int i = 0; i < nodeCount; i++) v[i] = nodes[i].getValue();
+        return v;
+    }
+
+    public double[] toEdgeWeightVector() {
+        double[] v = new double[edgeCount];
+        for (int i = 0; i < edgeCount; i++) v[i] = edges[i].getWeight();
+        return v;
+    }
+
+    public String toJSON() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"studentId\":\"").append(studentId).append("\",");
+        sb.append("\"nodes\":[");
+        for (int i = 0; i < nodeCount; i++) {
+            FeatureNode n = nodes[i];
+            sb.append("{")
+              .append("\"id\":\"").append(n.getId()).append("\",")
+              .append("\"feature\":\"").append(n.getFeatureName()).append("\",")
+              .append("\"value\":").append(n.getValue())
+              .append("}");
+            if (i < nodeCount - 1) sb.append(",");
+        }
+        sb.append("],\"edges\":[");
+        for (int i = 0; i < edgeCount; i++) {
+            FeatureEdge e = edges[i];
+            sb.append("{")
+              .append("\"src\":\"").append(e.getSourceNode().getId()).append("\",")
+              .append("\"tgt\":\"").append(e.getTargetNode().getId()).append("\",")
+              .append("\"weight\":").append(e.getWeight())
+              .append("}");
+            if (i < edgeCount - 1) sb.append(",");
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    private int findNodeIndex(String nodeId) {
+        for (int i = 0; i < nodeCount; i++)
+            if (nodes[i].getId().equals(nodeId)) return i;
+        return -1;
+    }
+
+    private int findEdgeIndex(String edgeId) {
+        for (int i = 0; i < edgeCount; i++)
+            if (edges[i].getId().equals(edgeId)) return i;
+        return -1;
+    }
+
+    private void removeEdgesForNode(String nodeId) {
+        for (int i = edgeCount - 1; i >= 0; i--) {
+            if (edges[i].getSourceNode().getId().equals(nodeId) ||
+                edges[i].getTargetNode().getId().equals(nodeId)) {
+                for (int j = i; j < edgeCount - 1; j++) edges[j] = edges[j + 1];
+                edges[--edgeCount] = null;
+            }
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "HandwritingGraph{studentId='" + studentId +
+               "', nodes=" + nodeCount + ", edges=" + edgeCount + "}";
+    }
+}package model;
+
+/**
+ * Represents a relationship between two FeatureNodes in the handwriting graph.
+ * Each edge has a weight that indicates the strength of the relationship
+ * and a type that describes the nature of the relationship.
+ */
+public class FeatureEdge {
+
+    /** Unique identifier for this edge */
+    private String id;
+
+    /** The node where this edge starts */
+    private FeatureNode sourceNode;
+
+    /** The node where this edge ends */
+    private FeatureNode targetNode;
+
+    /** The strength of the relationship between the two nodes */
+    private double weight;
+
+    /** The type of relationship between the two nodes (e.g. spatial, structural, pressure) */
+    private String relationshipType;
+
+    /**
+     * Constructor for FeatureEdge
+     * @param id the unique identifier for this edge
+     * @param sourceNode the node where this edge starts
+     * @param targetNode the node where this edge ends
+     * @param weight the strength of the relationship between the two nodes
+     * @param relationshipType the type of relationship between the two nodes
+     */
+    public FeatureEdge(String id, FeatureNode sourceNode, FeatureNode targetNode,
+                       double weight, String relationshipType) {
+        this.id = id;
+        this.sourceNode = sourceNode;
+        this.targetNode = targetNode;
+        this.weight = weight;
+        this.relationshipType = relationshipType;
+    }
+
+    /**
+     * Gets the id of this edge
+     * @return the edge id
+     */
+    public String getId() {
+        return id;
+    }
+
+    /**
+     * Sets the id of this edge
+     * @param id the new edge id
+     */
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    /**
+     * Gets the source node of this edge
+     * @return the source node
+     */
+    public FeatureNode getSourceNode() {
+        return sourceNode;
+    }
+
+    /**
+     * Sets the source node of this edge
+     * @param sourceNode the new source node
+     */
+    public void setSourceNode(FeatureNode sourceNode) {
+        this.sourceNode = sourceNode;
+    }
+
+    /**
+     * Gets the target node of this edge
+     * @return the target node
+     */
+    public FeatureNode getTargetNode() {
+        return targetNode;
+    }
+
+    /**
+     * Sets the target node of this edge
+     * @param targetNode the new target node
+     */
+    public void setTargetNode(FeatureNode targetNode) {
+        this.targetNode = targetNode;
+    }
+
+    /**
+     * Gets the weight of this edge
+     * @return the edge weight
+     */
+    public double getWeight() {
+        return weight;
+    }
+
+    /**
+     * Sets the weight of this edge
+     * @param weight the new edge weight
+     */
+    public void setWeight(double weight) {
+        this.weight = weight;
+    }
+
+    /**
+     * Gets the relationship type of this edge
+     * @return the relationship type
+     */
+    public String getRelationshipType() {
+        return relationshipType;
+    }
+
+    /**
+     * Sets the relationship type of this edge
+     * @param relationshipType the new relationship type
+     */
+    public void setRelationshipType(String relationshipType) {
+        this.relationshipType = relationshipType;
+    }
+
+    /**
+     * Returns a string representation of this edge
+     * @return a string describing the edge
+     */
+    @Override
+    public String toString() {
+        return "FeatureEdge{id='" + id + "', " +
+               sourceNode.getFeatureName() + " --[" + weight + "]--> " +
+               targetNode.getFeatureName() + ", type='" + relationshipType + "'}";
+    }
+}package model;
+
+public class FeatureNode {
+
+    private String id;
+    private String featureName;
+    private double value;
+
+    // Pixel coordinates — used by ImageSkeletonisationGraph to position
+    // skeleton nodes directly on the handwriting image.
+    // Default to -1 when not a spatial node (e.g. feature-vector nodes).
+    private double x;
+    private double y;
+
+    /**
+     * Standard constructor — used by FeatureExtractor for the 5 handwriting
+     * feature nodes (SlantAngle, LetterSpacing, etc.).
+     * x and y default to -1 (no screen position).
+     */
+    public FeatureNode(String id, String featureName, double value) {
+        this.id          = id;
+        this.featureName = featureName;
+        this.value       = value;
+        this.x           = -1;
+        this.y           = -1;
+    }
+
+    /**
+     * Spatial constructor — used by ImageSkeletonisationGraph to place nodes
+     * at specific pixel coordinates on the skeleton image.
+     */
+    public FeatureNode(String id, String featureName, double value, double x, double y) {
+        this.id          = id;
+        this.featureName = featureName;
+        this.value       = value;
+        this.x           = x;
+        this.y           = y;
+    }
+
+    public String getId()                        { return id; }
+    public void   setId(String id)               { this.id = id; }
+
+    public String getFeatureName()               { return featureName; }
+    public void   setFeatureName(String name)    { this.featureName = name; }
+
+    public double getValue()                     { return value; }
+    public void   setValue(double value)         { this.value = value; }
+
+    public double getX()                         { return x; }
+    public double getY()                         { return y; }
+
+    @Override
+    public String toString() {
+        return "FeatureNode{id='" + id + "', feature='" + featureName +
+               "', value=" + value + "}";
+    }
+}package utilities;
+/**
+ * Represents the location of a pixel in terms of its x and y coordinates.
+ * @author Leon Nkadimeng
+ */
+public class PixelLocation {
+	private int x, y;
+	/**
+	 * 
+	 * @param x
+	 * @param y
+	 */
+	public PixelLocation(int x, int y) {
+		this.x = x;
+		this.y = y;
+	}
+	
+	public int getX() {return x;}
+	public int getY() {return y;}
+	@Override
+	public boolean equals(Object other) {
+		PixelLocation l = (PixelLocation)other;
+		return (x == l.x) && (y == l.y);
+	}
+}
+package utilities;
+import images.BWImage;
+import images.GrayScaleImage;
+
+public class GrayScaleImageBinarizer {
+
+	/**
+	 * Computes mean of surrounding pixels within the window, including the center pixel (pixel @ (x, y))
+	 * @param image gray scale image containing the pixels
+	 * @param x x-coordinate of center pixel
+	 * @param y y-coordinate of center pixel
+	 * @param paddingAmount amount of padding we added to the image which is half the size of our window
+	 * @return mean of surrounding pixels within the window
+	 */
+	private double computeMean(GrayScaleImage image, int x, int y, int paddingAmount) {
+		double mean = 0d;
+		int outerStart = y - paddingAmount;
+		int outerEnd   = y + paddingAmount;
+		int innerStart = x - paddingAmount;
+		int innerEnd   = x + paddingAmount;
+
+		for (int yCoord = outerStart; yCoord <= outerEnd; yCoord++)
+			for (int xCoord = innerStart; xCoord <= innerEnd; xCoord++)
+				mean += image.getPixel(xCoord, yCoord);
+
+		final int n = (innerEnd - innerStart + 1) * (outerEnd - outerStart + 1);
+		return mean / n;
+	}
+
+	/**
+	 * Computes standard deviation of surrounding pixels within the window
+	 */
+	private double computeStandardDeviation(GrayScaleImage image, int x, int y,
+	                                         double mean, int paddingAmount) {
+		int outerStart = y - paddingAmount;
+		int outerEnd   = y + paddingAmount;
+		int innerStart = x - paddingAmount;
+		int innerEnd   = x + paddingAmount;
+
+		double sum = 0d;
+		for (int yCoord = outerStart; yCoord <= outerEnd; yCoord++)
+			for (int xCoord = innerStart; xCoord <= innerEnd; xCoord++)
+				sum += Math.pow(image.getPixel(xCoord, yCoord) - mean, 2);
+
+		final int n = (innerEnd - innerStart + 1) * (outerEnd - outerStart + 1);
+		return Math.sqrt(sum / (n - 1));
+	}
+
+	/**
+	 * Calculates Niblack's threshold for a pixel
+	 */
+	private double computeNiblacksThreshold(double mean, double k,
+	                                          double standardDev, double R) {
+		return mean * (1 + k * ((standardDev / R) - 1));
+	}
+
+	/**
+	 * Applies Niblack's adaptive thresholding to a greyscale image.
+	 *
+	 * Convention: 1 = ink (dark pixel), 0 = background (light pixel).
+	 * A pixel whose greyscale value is BELOW the local threshold is ink.
+	 * This is the correct direction for handwriting on a white background.
+	 *
+	 * The old version had this inverted (> threshold → 1), which caused
+	 * every feature extractor to see a mostly-white skeleton and produce
+	 * LoopFrequency=0 and PressureZone=100 for all students.
+	 */
+	public BWImage applyNiblacksMethod(GrayScaleImage image) {
+		BWImage newImage = new BWImage(image.getWidth(), image.getHeight(), image.getName());
+		final int paddingAmount = 7;
+		GrayScaleImage paddedImage = padImage(image, paddingAmount);
+
+		for (int y = 0; y < image.getHeight(); y++) {
+			for (int x = 0; x < image.getWidth(); x++) {
+				final double mean  = computeMean(paddedImage,
+				                        x + paddingAmount, y + paddingAmount, paddingAmount);
+				final double stdDev = computeStandardDeviation(paddedImage,
+				                        x + paddingAmount, y + paddingAmount, mean, paddingAmount);
+				final double threshold = computeNiblacksThreshold(mean, 0.2, stdDev, 128);
+
+				// pixel BELOW threshold = dark = ink = 1
+				// pixel ABOVE threshold = light = background = 0
+				if (image.getPixel(x, y) > threshold) {
+					newImage.setPixel(x, y, 0);   // background
+				} else {
+					newImage.setPixel(x, y, 1);   // ink
+				}
+			}
+		}
+
+		return newImage;
+	}
+
+	/**
+	 * Pads the image by replicating border pixels outward.
+	 */
+	private static GrayScaleImage padImage(GrayScaleImage image, int amount) {
+		GrayScaleImage padded = new GrayScaleImage(
+			image.getWidth()  + amount * 2,
+			image.getHeight() + amount * 2,
+			image.getName());
+
+		for (int y = 0; y < padded.getHeight(); y++) {
+			for (int x = 0; x < padded.getWidth(); x++) {
+				int srcX = Math.min(Math.max(x - amount, 0), image.getWidth()  - 1);
+				int srcY = Math.min(Math.max(y - amount, 0), image.getHeight() - 1);
+				padded.setPixel(x, y, image.getPixel(srcX, srcY));
+			}
+		}
+		return padded;
+	}
+}package utilities;
+import images.GrayScaleImage;
+import images.RGBImage;
+
+public class RGBToGrayScaleImageConverter {
+	/**
+	 * Converts the RGBImage into a grayscale by calculating a weighted average of each pixel's values.
+	 * @param image rgb image we want to convert
+	 * @return the gray scale image
+	 */
+	public static GrayScaleImage toGreyScale(RGBImage image) {
+		GrayScaleImage greyScale = new GrayScaleImage(image.getWidth(), image.getHeight(), image.getName());
+		for(int y = 0; y < image.getHeight(); y++) {
+			for(int x = 0; x < image.getWidth(); x++) {
+				// calculate weighted average of rgb pixel values
+				double intensity = 0.299 * image.getPixel(x, y).getRed();
+				intensity+= 0.587 * image.getPixel(x, y).getGreen();
+				intensity += 0.114 * image.getPixel(x, y).getBlue();
+				greyScale.setPixel(x, y, intensity);
+			}
+		}
+		return greyScale;
+	}
+}
+package utilities;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+import images.BWImage;
+import images.GrayScaleImage;
+import images.RGBImage;
+
+public class PPMImageCreator {
+	public static void createPPM(BWImage image) {
+		File file = new File(String.format("data\\PPMImages\\%s.ppm", image.getName()));
+		
+		try (
+			FileOutputStream fos = new FileOutputStream(file);
+			BufferedOutputStream bos = new BufferedOutputStream(fos);
+			PrintWriter pw = new PrintWriter(bos);
+			){
+			pw.print(image.toPPM());
+			pw.flush();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		
+	}
+	public static void createPPM(RGBImage image) {
+		File file = new File(String.format("data\\PPMImages\\%s.ppm", image.getName()));
+		
+		try (
+			FileOutputStream fos = new FileOutputStream(file);
+			BufferedOutputStream bos = new BufferedOutputStream(fos);
+			PrintWriter pw = new PrintWriter(bos);
+			){
+			pw.print(image.toPPM());
+			pw.flush();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		
+	}
+	public static void createPPM(GrayScaleImage image) {
+		File file = new File(String.format("data\\PPMImages\\%s.ppm", image.getName()));
+		
+		try (
+			FileOutputStream fos = new FileOutputStream(file);
+			BufferedOutputStream bos = new BufferedOutputStream(fos);
+			PrintWriter pw = new PrintWriter(bos);
+			){
+			pw.print(image.toPPM());
+			pw.flush();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		
+	}
+}
+package ui;
+
+import org.graphstream.graph.Graph;
+import org.graphstream.graph.implementations.SingleGraph;
+import org.graphstream.ui.fx_viewer.FxViewer;
+import org.graphstream.ui.view.View;
+import algorithm.FeatureExtractor;
+import database.StudentDatabase;
+import images.BWImage;
+import graph.ImageSkeletonisationGraph;
+import model.FeatureEdge;
+import model.FeatureNode;
+import model.HandwritingGraph;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Group;
+import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.stage.Stage;
+
+import java.io.File;
+
+/**
+ * Student Database Management view.
+ * Provides CRUD operations for students and their handwriting graphs.
+ *
+ * Preloading is done on a background thread so the GUI appears immediately
+ * instead of freezing while Zhang-Suen runs on all 5 sample images.
+ */
+public class DatabaseView extends BorderPane {
+
+    private StudentDatabase db;
+    private TableView<StudentRow> tableView;
+    private ObservableList<StudentRow> studentData;
+    private TextField txtName, txtId;
+    private TextArea txtDetails;
+    private Label loadingLabel;
+
+    public DatabaseView() {
+        db = StudentDatabase.getInstance();
+        setupUI();
+
+        if (db.getStudentCount() == 0) {
+            loadingLabel.setText("Loading students... (running image pipeline)");
+            preloadInBackground();
+        } else {
+            loadingLabel.setText("");
+            refreshTable();
+        }
+    }
+
+    // =========================================================================
+    // Background preloading
+    // =========================================================================
+
+    private void preloadInBackground() {
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                db.preloadStudents();
+                return null;
+            }
+        };
+        task.setOnSucceeded(e -> { loadingLabel.setText(""); refreshTable(); });
+        task.setOnFailed(e -> loadingLabel.setText(
+            "Error loading students: " + task.getException().getMessage()));
+        Thread t = new Thread(task);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // =========================================================================
+    // Image compositing helpers
+    // =========================================================================
+
+    /**
+     * Composites the skeleton (red pixels) on top of the original sample image.
+     *
+     * Every pixel where the skeleton has ink (value == 1) is drawn as solid red.
+     * All other pixels are taken from the original image, preserving the context
+     * so the user can see exactly where the skeleton sits on the handwriting.
+     *
+     * @param skeleton   the Zhang-Suen skeleton (1 = ink, 0 = background)
+     * @param imagePath  path to the student's original sample PNG
+     * @return composited WritableImage, or a plain red-on-white image if the
+     *         original cannot be loaded
+     */
+    private WritableImage buildOverlayImage(BWImage skeleton, String imagePath) {
+        int width  = skeleton.getWidth();
+        int height = skeleton.getHeight();
+
+        WritableImage result = new WritableImage(width, height);
+        PixelWriter pw = result.getPixelWriter();
+
+        // Try to load the original image as the background
+        PixelReader originalPR = null;
+        try {
+            File f = new File(imagePath);
+            if (f.exists()) {
+                Image orig = new Image("file:" + f.getAbsolutePath());
+                // Only use it if dimensions match (they should — same image was processed)
+                if ((int) orig.getWidth() == width && (int) orig.getHeight() == height) {
+                    originalPR = orig.getPixelReader();
+                }
+            }
+        } catch (Exception ignored) { }
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                Integer px = skeleton.getPixel(x, y);
+                if (px != null && px == 1) {
+                    // Skeleton ink pixel — draw as solid red
+                    pw.setColor(x, y, Color.RED);
+                } else {
+                    // Background — use the original image pixel if available,
+                    // otherwise white
+                    if (originalPR != null) {
+                        pw.setArgb(x, y, originalPR.getArgb(x, y));
+                    } else {
+                        pw.setColor(x, y, Color.WHITE);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    // =========================================================================
+    // UI setup
+    // =========================================================================
+
+    private void setupUI() {
+        Label title = new Label("Handwriting Analysis System - Student Database");
+        title.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+
+        loadingLabel = new Label("");
+        loadingLabel.setStyle("-fx-text-fill: #888; -fx-font-style: italic;");
+
+        tableView = new TableView<>();
+        setupTableColumns();
+
+        GridPane formPane = createFormPane();
+
+        txtDetails = new TextArea();
+        txtDetails.setEditable(false);
+        txtDetails.setPrefHeight(150);
+
+        HBox buttonBox = createButtonBox();
+
+        VBox topBox = new VBox(6, title, loadingLabel, buttonBox);
+        topBox.setPadding(new Insets(10));
+
+        SplitPane splitPane = new SplitPane();
+        splitPane.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        splitPane.getItems().addAll(tableView, formPane, txtDetails);
+        splitPane.setDividerPositions(0.5, 0.75);
+
+        setTop(topBox);
+        setCenter(splitPane);
+    }
+
+    private void setupTableColumns() {
+        TableColumn<StudentRow, String> idCol = new TableColumn<>("Student ID");
+        idCol.setCellValueFactory(cd -> cd.getValue().idProperty());
+        idCol.setPrefWidth(100);
+
+        TableColumn<StudentRow, String> nameCol = new TableColumn<>("Student Name");
+        nameCol.setCellValueFactory(cd -> cd.getValue().nameProperty());
+        nameCol.setPrefWidth(150);
+
+        TableColumn<StudentRow, String> graphCol = new TableColumn<>("Graph Info");
+        graphCol.setCellValueFactory(cd -> cd.getValue().graphInfoProperty());
+        graphCol.setPrefWidth(200);
+
+        tableView.getColumns().addAll(idCol, nameCol, graphCol);
+
+        tableView.getSelectionModel().selectedItemProperty().addListener(
+            (obs, oldVal, newVal) -> {
+                if (newVal != null) {
+                    showGraphDetails(newVal.getStudentId());
+                    txtId.setText(newVal.getStudentId());
+                    txtName.setText(newVal.getStudentName());
+                }
+            }
+        );
+    }
+
+    private GridPane createFormPane() {
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(10));
+
+        grid.add(new Label("Student ID:"), 0, 0);
+        txtId = new TextField();
+        txtId.setPromptText("e.g., S006");
+        grid.add(txtId, 1, 0);
+
+        grid.add(new Label("Student Name:"), 0, 1);
+        txtName = new TextField();
+        txtName.setPromptText("Full name");
+        grid.add(txtName, 1, 1);
+
+        return grid;
+    }
+
+    private HBox createButtonBox() {
+        Button btnAdd            = new Button("Add Student");
+        Button btnUpdate         = new Button("Update Student");
+        Button btnDelete         = new Button("Delete Student");
+        Button btnRefresh        = new Button("Refresh");
+        Button btnViewGraph      = new Button("View Skeleton");
+        Button btnVisualizeGraph = new Button("Visualize Graph");
+
+        btnAdd.setOnAction(e -> addStudent());
+        btnUpdate.setOnAction(e -> updateStudent());
+        btnDelete.setOnAction(e -> deleteStudent());
+        btnRefresh.setOnAction(e -> refreshTable());
+        btnViewGraph.setOnAction(e -> viewGraph());
+        btnVisualizeGraph.setOnAction(e -> visualizeGraph());
+
+        HBox box = new HBox(10, btnAdd, btnUpdate, btnDelete,
+                                btnRefresh, btnViewGraph, btnVisualizeGraph);
+        box.setPadding(new Insets(10));
+        return box;
+    }
+
+    // =========================================================================
+    // CRUD actions
+    // =========================================================================
+
+    private void addStudent() {
+        String id   = txtId.getText().trim();
+        String name = txtName.getText().trim();
+
+        if (id.isEmpty() || name.isEmpty()) {
+            showAlert("Error", "Please enter both Student ID and Name");
+            return;
+        }
+        if (db.studentExists(id)) {
+            showAlert("Error", "Student ID already exists!");
+            return;
+        }
+
+        HandwritingGraph graph = new HandwritingGraph(id);
+        graph.addNode(new FeatureNode("N1", "SlantAngle",    0.0));
+        graph.addNode(new FeatureNode("N2", "LetterSpacing", 0.0));
+        graph.addNode(new FeatureNode("N3", "StrokeDensity", 0.0));
+        graph.addNode(new FeatureNode("N4", "LoopFrequency", 0.0));
+        graph.addNode(new FeatureNode("N5", "PressureZone",  0.0));
+
+        boolean ok = db.addStudent(id, name, "data/students/" + id + "/sample.png", graph);
+        if (ok) { refreshTable(); clearForm(); showAlert("Success", "Student added successfully!"); }
+        else      showAlert("Error", "Could not add student (database may be full)");
+    }
+
+    private void updateStudent() {
+        String id   = txtId.getText().trim();
+        String name = txtName.getText().trim();
+
+        if (id.isEmpty() || name.isEmpty()) {
+            showAlert("Error", "Please select a student to update");
+            return;
+        }
+        boolean ok = db.updateStudentName(id, name);
+        if (ok) { refreshTable(); showAlert("Success", "Student updated successfully!"); }
+        else      showAlert("Error", "Student not found");
+    }
+
+    private void deleteStudent() {
+        String id = txtId.getText().trim();
+        if (id.isEmpty()) { showAlert("Error", "Please select a student to delete"); return; }
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirm Delete");
+        confirm.setContentText("Are you sure you want to delete student " + id + "?");
+        if (confirm.showAndWait().get() == ButtonType.OK) {
+            if (db.removeStudent(id)) { refreshTable(); clearForm(); showAlert("Success", "Student deleted!"); }
+        }
+    }
+
+    // =========================================================================
+    // Display helpers
+    // =========================================================================
+
+    public void refreshTable() {
+        studentData = FXCollections.observableArrayList();
+        for (String id : db.getAllStudentIds()) {
+            HandwritingGraph g = db.getStudentGraph(id);
+            studentData.add(new StudentRow(id, db.getStudentName(id),
+                String.format("%d nodes, %d edges", g.getNodeCount(), g.getEdgeCount())));
+        }
+        tableView.setItems(studentData);
+    }
+
+    private void showGraphDetails(String studentId) {
+        HandwritingGraph g = db.getStudentGraph(studentId);
+        if (g == null) return;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== Handwriting Graph for ").append(studentId).append(" ===\n\nNodes:\n");
+        for (FeatureNode n : g.getAllNodes())
+            sb.append(String.format("  * %s: %.2f%n", n.getFeatureName(), n.getValue()));
+        sb.append("\nEdges:\n");
+        for (FeatureEdge e : g.getAllEdges())
+            sb.append(String.format("  * %s -> %s  (weight: %.2f, type: %s)%n",
+                e.getSourceNode().getFeatureName(), e.getTargetNode().getFeatureName(),
+                e.getWeight(), e.getRelationshipType()));
+        txtDetails.setText(sb.toString());
+    }
+
+    // =========================================================================
+    // Skeleton viewer — red overlay + scroll + zoom
+    // =========================================================================
+
+    /**
+     * Opens a new window showing the student's skeletonized handwriting as a
+     * red overlay on top of their original sample image.
+     *
+     * Features:
+     *   - Skeleton runs on a background thread so the window appears immediately
+     *   - Red skeleton pixels composited over the original greyscale sample
+     *   - ScrollPane so the user can pan when zoomed in
+     *   - Zoom In / Zoom Out / Reset buttons
+     *   - Mouse scroll wheel zoom (Ctrl+scroll or plain scroll)
+     */
+    private void viewGraph() {
+        StudentRow sel = tableView.getSelectionModel().getSelectedItem();
+        if (sel == null) {
+            showAlert("No Selection", "Please select a student first.");
+            return;
+        }
+
+        String studentId = sel.getStudentId();
+        HandwritingGraph hwg = db.getStudentGraph(studentId);
+        String imagePath = db.getStudentImagePath(studentId);
+
+        // ── Window ────────────────────────────────────────────────────────────
+        Stage stage = new Stage();
+        stage.setTitle("Skeleton Graph — " + sel.getStudentName());
+
+        // Feature summary panel (top) — same as before
+        Label titleLabel = new Label(sel.getStudentName() + "  (" + studentId + ")");
+        titleLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
+
+        TextArea featureArea = new TextArea();
+        featureArea.setEditable(false);
+        featureArea.setPrefHeight(110);
+        StringBuilder fb = new StringBuilder("Extracted features\n");
+        fb.append("----------------------------\n");
+        for (FeatureNode n : hwg.getAllNodes())
+            fb.append(String.format("  %-15s  %8.2f%n", n.getFeatureName(), n.getValue()));
+        featureArea.setText(fb.toString());
+
+        VBox topPanel = new VBox(8, titleLabel, featureArea);
+        topPanel.setPadding(new Insets(10));
+
+        // ── Canvas area ───────────────────────────────────────────────────────
+        // Canvas cannot be scaled with setFitWidth like ImageView can.
+        // We wrap it in a Group and scale the Group instead.
+        Group canvasGroup = new Group();
+
+        StackPane imageHolder = new StackPane(canvasGroup);
+        imageHolder.setStyle("-fx-background-color: #1a1a1a;");
+
+        ScrollPane scroll = new ScrollPane(imageHolder);
+        scroll.setPannable(true);
+        scroll.setFitToWidth(false);
+        scroll.setFitToHeight(false);
+
+        // ── Zoom ──────────────────────────────────────────────────────────────
+        double[] scale = { 1.0 };
+
+        Runnable applyZoom = () -> {
+            canvasGroup.setScaleX(scale[0]);
+            canvasGroup.setScaleY(scale[0]);
+            if (!canvasGroup.getChildren().isEmpty()) {
+                Canvas c = (Canvas) canvasGroup.getChildren().get(0);
+                imageHolder.setMinSize(c.getWidth() * scale[0], c.getHeight() * scale[0]);
+                imageHolder.setPrefSize(c.getWidth() * scale[0], c.getHeight() * scale[0]);
+            }
+        };
+
+        Label zoomLabel = new Label("100%");
+        zoomLabel.setMinWidth(50);
+        zoomLabel.setStyle("-fx-font-size: 12px;");
+
+        Button btnZoomIn  = new Button("+ Zoom In");
+        Button btnZoomOut = new Button("- Zoom Out");
+        Button btnReset   = new Button("Reset");
+
+        btnZoomIn.setOnAction(e -> {
+            scale[0] = Math.min(scale[0] * 1.25, 8.0);
+            applyZoom.run();
+            zoomLabel.setText(String.format("%.0f%%", scale[0] * 100));
+        });
+        btnZoomOut.setOnAction(e -> {
+            scale[0] = Math.max(scale[0] * 0.8, 0.1);
+            applyZoom.run();
+            zoomLabel.setText(String.format("%.0f%%", scale[0] * 100));
+        });
+        btnReset.setOnAction(e -> {
+            scale[0] = 1.0;
+            applyZoom.run();
+            zoomLabel.setText("100%");
+        });
+
+        scroll.setOnScroll(event -> {
+            event.consume();
+            double factor = event.getDeltaY() > 0 ? 1.15 : (1.0 / 1.15);
+            scale[0] = Math.min(Math.max(scale[0] * factor, 0.1), 8.0);
+            applyZoom.run();
+            zoomLabel.setText(String.format("%.0f%%", scale[0] * 100));
+        });
+
+        Label legend = new Label(
+            "  Red = junction node     Green = endpoint node     Blue = stroke edge");
+        legend.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
+
+        HBox bottomBar = new HBox(10, btnZoomIn, btnZoomOut, btnReset, zoomLabel, legend);
+        bottomBar.setAlignment(Pos.CENTER_LEFT);
+        bottomBar.setPadding(new Insets(8, 12, 8, 12));
+        bottomBar.setStyle("-fx-border-color: #ddd; -fx-border-width: 1 0 0 0;");
+
+        BorderPane root = new BorderPane();
+        root.setTop(topPanel);
+        root.setCenter(scroll);
+        root.setBottom(bottomBar);
+
+        stage.setScene(new Scene(root, 760, 700));
+        stage.show();
+
+        // ── Guard ─────────────────────────────────────────────────────────────
+        if (imagePath == null || !new File(imagePath).exists()) {
+            showErrorCanvas(canvasGroup, "Sample image not found: " + imagePath);
+            return;
+        }
+
+        // ── Run pipeline on background thread ─────────────────────────────────
+        ProgressIndicator spinner = new ProgressIndicator();
+        imageHolder.getChildren().add(spinner);
+
+        Task<Canvas> task = new Task<>() {
+            @Override
+            protected Canvas call() {
+                Image rawImage = new Image(
+                    "file:" + new File(imagePath).getAbsolutePath());
+                if (rawImage.getWidth() <= 0) return null;
+
+                // 140 = binarization threshold, 20 = node cluster radius
+                // These match the defaults in ImageSkeletonisationGraph
+                ImageSkeletonisationGraph isg =
+                    new ImageSkeletonisationGraph(rawImage, studentId, 140, 20);
+
+                return isg.getDisplayCanvas();
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            imageHolder.getChildren().remove(spinner);
+            Canvas canvas = task.getValue();
+            if (canvas == null) {
+                showErrorCanvas(canvasGroup, "Failed to generate skeleton graph.");
+                return;
+            }
+            canvasGroup.getChildren().setAll(canvas);
+            imageHolder.setMinSize(canvas.getWidth(), canvas.getHeight());
+            imageHolder.setPrefSize(canvas.getWidth(), canvas.getHeight());
+            applyZoom.run();
+        });
+
+        task.setOnFailed(e -> {
+            imageHolder.getChildren().remove(spinner);
+            showErrorCanvas(canvasGroup,
+                "Error: " + task.getException().getMessage());
+            task.getException().printStackTrace();
+        });
+
+        Thread t = new Thread(task);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void showErrorCanvas(Group group, String message) {
+        Canvas c = new Canvas(500, 200);
+        GraphicsContext gc = c.getGraphicsContext2D();
+        gc.setFill(Color.rgb(240, 240, 240));
+        gc.fillRect(0, 0, 500, 200);
+        gc.setFill(Color.DARKRED);
+        gc.setFont(Font.font(13));
+        gc.fillText(message, 20, 60);
+        group.getChildren().setAll(c);
+        System.err.println("Skeleton viewer: " + message);
+    }
+
+    // =========================================================================
+    // GraphStream graph visualizer
+    // =========================================================================
+
+    private void visualizeGraph() {
+        StudentRow sel = tableView.getSelectionModel().getSelectedItem();
+        if (sel == null) return;
+
+        Graph graph = new SingleGraph("Graph");
+        HandwritingGraph hwg = db.getStudentGraph(sel.getStudentId());
+
+        for (FeatureNode n : hwg.getAllNodes())
+            graph.addNode(n.getId())
+                 .setAttribute("ui.label",
+                     String.format("%s\nValue: %.2f", n.getFeatureName(), n.getValue()));
+
+        for (FeatureEdge e : hwg.getAllEdges())
+            graph.addEdge(e.getId(),
+                          e.getSourceNode().getId(),
+                          e.getTargetNode().getId())
+                 .setAttribute("ui.label",
+                     String.format("weight: %.2f\ntype: %s",
+                         e.getWeight(), e.getRelationshipType()));
+
+        FxViewer viewer = new FxViewer(graph, FxViewer.ThreadingModel.GRAPH_IN_GUI_THREAD);
+        viewer.enableAutoLayout();
+        View view = viewer.addDefaultView(false);
+
+        GridPane gp = new GridPane();
+        gp.add(new Label("Student " + sel.getStudentId() + "'s feature graph"), 0, 0);
+        gp.add((javafx.scene.Node) view, 0, 1);
+
+        Stage stage = new Stage();
+        stage.setScene(new Scene(gp, 500, 500));
+        stage.setTitle("Feature Graph — " + sel.getStudentName());
+        stage.show();
+    }
+
+    // =========================================================================
+    // Utilities
+    // =========================================================================
+
+    private void clearForm() { txtId.clear(); txtName.clear(); txtDetails.clear(); }
+
+    private void showAlert(String title, String msg) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        alert.showAndWait();
+    }
+
+    // =========================================================================
+    // Inner class for table rows
+    // =========================================================================
+
+    public static class StudentRow {
+        private final javafx.beans.property.StringProperty id;
+        private final javafx.beans.property.StringProperty name;
+        private final javafx.beans.property.StringProperty graphInfo;
+
+        public StudentRow(String id, String name, String graphInfo) {
+            this.id        = new javafx.beans.property.SimpleStringProperty(id);
+            this.name      = new javafx.beans.property.SimpleStringProperty(name);
+            this.graphInfo = new javafx.beans.property.SimpleStringProperty(graphInfo);
+        }
+
+        public String getStudentId()   { return id.get(); }
+        public String getStudentName() { return name.get(); }
+        public javafx.beans.property.StringProperty idProperty()        { return id; }
+        public javafx.beans.property.StringProperty nameProperty()      { return name; }
+        public javafx.beans.property.StringProperty graphInfoProperty() { return graphInfo; }
+    }
+}package ui;
+
+import classification.HandwritingStyle;
+import classification.StyleOutput;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
+import model.HandwritingGraph;
+import model.FeatureNode;
+
+
+/**
+ * JavaFX panel that visualises the handwriting classification results for all
+ * students loaded from the database.
+
+ */
+public class ClassificationGraphView extends VBox {
+
+    //Style colour constants 
+    private static final String PRINT_COL   = "#378ADD";
+    private static final String CURSIVE_COL = "#7F77DD";
+    private static final String MIXED_COL   = "#EF9F27";
+
+    /**
+     * Used to colour edges and nodes in the per-student radial graph
+     * and the feature progress bars.
+     */
+    private static final Color[] FEATURE_COLORS = {
+        Color.web("#378ADD"), Color.web("#7F77DD"), Color.web("#EF9F27"),
+        Color.web("#1D9E75"), Color.web("#D85A30")
+    };
+
+    /**
+     *labels for the five features shown in the UI.
+     */
+    private static final String[] FEATURE_NAMES = {
+        "Slant", "Loops", "Spacing", "Pressure", "Density"
+    };
+
+    /**
+     * Internal keys used to look up 
+     */
+    private static final String[] FEATURE_KEYS = {
+        "SlantAngle", "LoopFrequency", "LetterSpacing",
+        "PressureZone", "StrokeDensity"
+    };
+
+    /**
+     * Minimum raw value per feature used in min-max normalisation to [0, 100].
+     */
+    private static final double[] FEAT_MIN = {60,  0,  3, 10, 1};
+
+    /**
+     * Maximum raw value per feature used in min-max normalisation to [0, 100].
+     * */
+    private static final double[] FEAT_MAX = {140, 15, 30, 90, 12};
+
+    /**
+     * Builds the initial placeholder view shown before any student data is loaded.
+     */
+    public ClassificationGraphView() {
+        setPadding(new Insets(15));
+        setSpacing(10);
+        Label title = new Label("Handwriting Classification Graph");
+        title.setStyle("-fx-font-size:18px;-fx-font-weight:bold;");
+        Label hint = new Label("Load students from the database to see results.");
+        hint.setStyle("-fx-font-size:12px;-fx-text-fill:#999;");
+        getChildren().addAll(title, hint);
+    }
+
+    /**
+     * Clears the panel and renders the full two-tab classification UI.
+     * @param results array of one per student;
+     * @param graphs  parallel array of objects used to
+     *                normalise raw feature values for the progress bars
+     */
+    public void displayClassificationGraph(StyleOutput[] results,HandwritingGraph[] graphs) {
+        getChildren().clear();
+
+        if (results == null || results.length == 0) {
+            getChildren().add(new Label("No students to classify."));
+            return;
+        }
+
+        Label title = new Label("Handwriting Classification Graph  —  GNN");
+        title.setStyle("-fx-font-size:18px;-fx-font-weight:bold;");
+        getChildren().add(title);
+
+        TabPane tabs = new TabPane();
+        tabs.setPrefHeight(650);
+
+        // Tab 1: bar chart + similarity table
+        Tab chartTab = new Tab("Style Distribution", buildChartPage(results));
+        chartTab.setClosable(false);
+
+        // Tab 2: inter-student GNN message-passing graph + breakdown cards
+        Tab gnnTab = new Tab("GNN Graph", buildGNNGraphPage(results, graphs));
+        gnnTab.setClosable(false);
+
+        tabs.getTabs().addAll(chartTab, gnnTab);
+        getChildren().add(tabs);
+    }
+
+    /**
+     * Builds the GNN Graph tab content: a circular canvas where each student is
+     * a node connected to all others by faint edges followed by a per-student feature-breakdown card.
+
+     * @param results classification outputs 
+     * @param graphs  used to compute normalised feature scores for the cards
+     * @return a wrapping the canvas and the student cards
+     */
+    private ScrollPane buildGNNGraphPage(StyleOutput[] results,
+                                          HandwritingGraph[] graphs) {
+        int N = results.length;
+        double W = 700, H = 500;
+        Canvas canvas = new Canvas(W, H);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+
+        // Light grey background
+        gc.setFill(Color.web("#f9fafb"));
+        gc.fillRect(0, 0, W, H);
+
+        double cx = W / 2, cy = H / 2;
+        double radius = Math.min(W, H) * 0.36;
+        double[] nx = new double[N];
+        double[] ny = new double[N];
+        for (int i = 0; i < N; i++) {
+            double angle = (2 * Math.PI / N) * i - Math.PI / 2;
+            nx[i] = cx + radius * Math.cos(angle);
+            ny[i] = cy + radius * Math.sin(angle);
+        }
+
+        // Full-mesh faint edges represent GNN message passing between all students
+        gc.setLineWidth(0.8);
+        gc.setGlobalAlpha(0.15);
+        gc.setStroke(Color.web("#6b7280"));
+        for (int i = 0; i < N; i++)
+            for (int j = i + 1; j < N; j++)
+                gc.strokeLine(nx[i], ny[i], nx[j], ny[j]);
+        gc.setGlobalAlpha(1.0);
+
+        // Draw each student node 
+        for (int i = 0; i < N; i++) {
+            if (results[i] == null) continue;
+
+            Color col = switch (results[i].getStyle()) {
+                case PRINT_BLOCK -> Color.web(PRINT_COL);
+                case CURSIVE     -> Color.web(CURSIVE_COL);
+                default          -> Color.web(MIXED_COL);
+            };
+
+
+            double ringR = 28 + (results[i].getSimilarityScore() / 100.0) * 10;
+            gc.setFill(col.deriveColor(0, 1, 1, 0.2));
+            gc.fillOval(nx[i] - ringR, ny[i] - ringR, ringR * 2, ringR * 2);
+
+            // Solid main node
+            gc.setFill(col);
+            gc.fillOval(nx[i] - 22, ny[i] - 22, 44, 44);
+
+            // Student first name + similarity % rendered inside the node
+            gc.setFill(Color.WHITE);
+            gc.setTextAlign(TextAlignment.CENTER);
+            gc.setFont(Font.font("Arial", FontWeight.BOLD, 8));
+            String[] parts = results[i].getStudentname().split(" ");
+            gc.fillText(parts[0], nx[i], ny[i] - 3);
+            gc.setFont(Font.font("Arial", FontWeight.BOLD, 9));
+            gc.fillText(String.format("%.0f%%",
+                    results[i].getSimilarityScore()), nx[i], ny[i] + 9);
+
+            // Style tag label drawn just below the node
+            gc.setFill(col);
+            gc.setFont(Font.font("Arial", FontWeight.BOLD, 10));
+            gc.fillText(results[i].getTag(), nx[i], ny[i] + 38);
+        }
+
+        // Canvas title and subtitle at the top
+        gc.setFill(Color.web("#374151"));
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.fillText("GNN Message Passing Graph", cx, 24);
+        gc.setFont(Font.font("Arial", 10));
+        gc.setFill(Color.web("#9ca3af"));
+        gc.fillText("Edges show which students influenced each other's classification",
+                cx, 40);
+
+        // Legend in the bottom-left corner
+        double lx = 20, ly = H - 70;
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, 11));
+        gc.setFill(Color.web("#374151"));
+        gc.fillText("Legend", lx + 30, ly);
+        String[][] legend = {{"PRINT", PRINT_COL}, {"CURSIVE", CURSIVE_COL},
+                             {"MIXED",  MIXED_COL}};
+        for (int i = 0; i < legend.length; i++) {
+            gc.setFill(Color.web(legend[i][1]));
+            gc.fillOval(lx, ly + 10 + i * 18, 12, 12);
+            gc.setFill(Color.web("#374151"));
+            gc.setFont(Font.font("Arial", 10));
+            gc.setTextAlign(TextAlignment.LEFT);
+            gc.fillText(legend[i][0], lx + 18, ly + 20 + i * 18);
+        }
+
+
+        VBox page = new VBox(12);
+        page.setPadding(new Insets(16));
+        page.getChildren().add(canvas);
+
+        Label breakdownTitle = new Label("Per-student GNN classification breakdown");
+        breakdownTitle.setStyle("-fx-font-size:13px;-fx-font-weight:bold;");
+        page.getChildren().add(breakdownTitle);
+
+        for (int i = 0; i < results.length; i++) {
+            if (results[i] == null) continue;
+            double[] norm = normalise(graphs[i]);
+            page.getChildren().add(buildStudentCard(results[i], norm));
+        }
+
+        ScrollPane scroll = new ScrollPane(page);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background-color:transparent;");
+        return scroll;
+    }
+
+    /**
+     * Builds one student card: a mini radial node graph on the left and a column
+     * of feature progress bars on the right, with the student's name, style
+     * badge, and GNN similarity score.
+     *
+     * @param student    classification result for this student
+     * @param normScores five normalised feature scores (0–100), 
+     * @return a styled  ready to add to a layout
+     */
+    private HBox buildStudentCard(StyleOutput student, double[] normScores) {
+
+        HBox card = new HBox(16);
+        card.setStyle("-fx-background-color:white;"
+                    + "-fx-background-radius:10;"
+                    + "-fx-border-color:#e5e7eb;"
+                    + "-fx-border-radius:10;"
+                    + "-fx-padding:12;");
+        card.setAlignment(Pos.CENTER_LEFT);
+
+        // Left radial node graph for this student
+        Canvas canvas = new Canvas(220, 220);
+        drawNodeGraph(canvas.getGraphicsContext2D(), student, normScores, 220, 220);
+        card.getChildren().add(canvas);
+
+        // Right info panel
+        VBox info = new VBox(8);
+        info.setPrefWidth(280);
+        info.setAlignment(Pos.TOP_LEFT);
+
+        // Name + coloured style badge on the same row
+        HBox nameRow = new HBox(10);
+        nameRow.setAlignment(Pos.CENTER_LEFT);
+        Label nameLabel = new Label(student.getStudentname());
+        nameLabel.setStyle("-fx-font-size:14px;-fx-font-weight:bold;");
+
+        Label styleBadge = new Label(student.getTag());
+        styleBadge.setStyle("-fx-background-color:" + badgeBgColor(student.getStyle())
+                          + ";-fx-text-fill:"        + badgeTextColor(student.getStyle())
+                          + ";-fx-padding:2 10;"
+                          + "-fx-background-radius:20;"
+                          + "-fx-font-size:11px;-fx-font-weight:bold;");
+        nameRow.getChildren().addAll(nameLabel, styleBadge);
+        info.getChildren().add(nameRow);
+
+        // GNN similarity confidence as a percentage
+        Label simLabel = new Label(String.format("Similarity: %.0f%%",
+                                   student.getSimilarityScore()));
+        simLabel.setStyle("-fx-font-size:12px;-fx-text-fill:#6b7280;");
+        info.getChildren().add(simLabel);
+
+        // Small italic note showing the score originates from GNN embeddings
+        Label gnnLabel = new Label("GNN-updated embeddings");
+        gnnLabel.setStyle("-fx-font-size:10px;-fx-text-fill:#9ca3af;"
+                        + "-fx-font-style:italic;");
+        info.getChildren().add(gnnLabel);
+
+        // One progress bar per feature
+        for (int i = 0; i < FEATURE_NAMES.length; i++) {
+            info.getChildren().add(
+                featureBar(FEATURE_NAMES[i], normScores[i],
+                           toHex(FEATURE_COLORS[i]))
+            );
+        }
+
+        card.getChildren().add(info);
+        return card;
+    }
+    
+    /**
+     * Creates a labelled horizontal progress bar for one handwriting feature.
+     * The filled width is proportional to clamped to [0, 100]
+     * and scaled to a maximum of 240 px.
+     *
+     * @param name  display label 
+     * @param pct   normalised score in [0, 100]
+     * @param color CSS hex fill colour for the bar
+     * @return a  containing the label row and the track
+     */
+    private VBox featureBar(String name, double pct, String color) {
+        VBox box = new VBox(2);
+
+        // Label row: feature name left-aligned, percentage right-aligned
+        HBox labelRow = new HBox();
+        labelRow.setAlignment(Pos.CENTER_LEFT);
+        Label lbl = new Label(name);
+        lbl.setStyle("-fx-font-size:11px;-fx-text-fill:#6b7280;");
+        Label val = new Label(String.format("%.0f%%", pct));
+        val.setStyle("-fx-font-size:11px;-fx-text-fill:#374151;");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        labelRow.getChildren().addAll(lbl, spacer, val);
+
+        // Grey background track
+        StackPane track = new StackPane();
+        track.setPrefHeight(6);
+        track.setStyle("-fx-background-color:#f3f4f6;-fx-background-radius:3;");
+
+        // Coloured fill bar — 100 % maps to 240 px wide
+        double fillPct = Math.max(0, Math.min(100, pct));
+        HBox fill = new HBox();
+        fill.setPrefHeight(6);
+        fill.setStyle("-fx-background-color:" + color + ";-fx-background-radius:3;");
+        fill.setPrefWidth(fillPct * 2.4);
+
+        StackPane.setAlignment(fill, Pos.CENTER_LEFT);
+        track.getChildren().add(fill);
+
+        box.getChildren().addAll(labelRow, track);
+        return box;
+    }
+
+
+    /**
+     * Draws a  node graph for a single student onto the given
+     * @param gc      the target graphics context
+     * @param student classification result (supplies name, style, similarity)
+     * @param scores  five normalised score
+     * @param w       canvas width in pixels
+     * @param h       canvas height in pixels
+     */
+    private void drawNodeGraph(GraphicsContext gc, StyleOutput student,
+                                double[] scores, double w, double h) {
+        double cx = w / 2, cy = h / 2;
+        double r  = Math.min(w, h) * 0.36;
+        int    n  = FEATURE_NAMES.length;
+
+        gc.clearRect(0, 0, w, h);
+
+        // Spoke edges — thickness proportional to each feature's score
+        for (int i = 0; i < n; i++) {
+            double angle = (2 * Math.PI / n) * i - Math.PI / 2;
+            double nx = cx + r * Math.cos(angle);
+            double ny = cy + r * Math.sin(angle);
+            gc.setStroke(FEATURE_COLORS[i]);
+            gc.setLineWidth(1.0 + (scores[i] / 100.0) * 4.0);
+            gc.setGlobalAlpha(0.6);
+            gc.strokeLine(cx, cy, nx, ny);
+            gc.setGlobalAlpha(1.0);
+        }
+
+        // Feature nodes — radius grows with the score
+        for (int i = 0; i < n; i++) {
+            double angle = (2 * Math.PI / n) * i - Math.PI / 2;
+            double nx    = cx + r * Math.cos(angle);
+            double ny    = cy + r * Math.sin(angle);
+            double nr    = 16 + (scores[i] / 100.0) * 10;
+
+            gc.setFill(FEATURE_COLORS[i]);
+            gc.fillOval(nx - nr, ny - nr, nr * 2, nr * 2);
+
+            // Feature name and score as white text inside the node
+            gc.setFill(Color.WHITE);
+            gc.setTextAlign(TextAlignment.CENTER);
+            gc.setFont(Font.font("Arial", FontWeight.BOLD, 8));
+            gc.fillText(FEATURE_NAMES[i], nx, ny - 2);
+            gc.setFont(Font.font("Arial", FontWeight.BOLD, 9));
+            gc.fillText(String.format("%.0f%%", scores[i]), nx, ny + 9);
+        }
+
+        // Central student node — colour determined by the classification style
+        Color centre = switch (student.getStyle()) {
+            case PRINT_BLOCK -> Color.web(PRINT_COL);
+            case CURSIVE     -> Color.web(CURSIVE_COL);
+            default          -> Color.web(MIXED_COL);
+        };
+        double cr = 26;
+        gc.setFill(centre);
+        gc.fillOval(cx - cr, cy - cr, cr * 2, cr * 2);
+
+        // Student name (first and optional second word) + similarity score
+        gc.setFill(Color.WHITE);
+        gc.setTextAlign(TextAlignment.CENTER);
+        String[] parts = student.getStudentname().split(" ");
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, 8));
+        gc.fillText(parts[0], cx, cy - 4);
+        if (parts.length > 1) gc.fillText(parts[1], cx, cy + 6);
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, 9));
+        gc.fillText(String.format("%.0f%%", student.getSimilarityScore()),
+                    cx, cy + 17);
+    }
+
+    /**
+     * Builds the Style Distribution tab: a bar chart of style counts above a
+     * scrollable results table.
+     * @param results classification results to display
+     * @return a containing the chart and the table
+     */
+    private VBox buildChartPage(StyleOutput[] results) {
+        VBox page = new VBox(16);
+        page.setPadding(new Insets(16));
+
+        page.getChildren().add(buildBarChart(results));
+
+        Label tableTitle = new Label("Student Results");
+        tableTitle.setStyle("-fx-font-size:14px;-fx-font-weight:bold;");
+        page.getChildren().addAll(tableTitle, buildTable(results));
+
+        return page;
+    }
+
+    /**
+     * Constructs a barChart with three bars: PRINT, CURSIVE, MIXED.
+     *
+     * Custom bar colours are applied via a scene-property listener because
+     * has been attached to a live scene
+     * @param results classification results to tally
+     * @return a styled and coloured bar chart
+     */
+    private BarChart<String, Number> buildBarChart(StyleOutput[] results) {
+        int print = 0, cursive = 0, mixed = 0;
+        for (StyleOutput r : results) {
+            if (r == null) continue;
+            switch (r.getStyle()) {
+                case PRINT_BLOCK: print++;   break;
+                case CURSIVE:     cursive++;  break;
+                default:          mixed++;    break;
+            }
+        }
+
+        int maxCount = Math.max(print, Math.max(cursive, mixed));
+
+        CategoryAxis xAxis = new CategoryAxis();
+        xAxis.setLabel("Handwriting Style");
+
+        NumberAxis yAxis = new NumberAxis(0, maxCount + 1, 1);
+        yAxis.setLabel("Number of Students");
+        yAxis.setMinorTickCount(0);
+        // Show integers only — no decimal tick labels
+        yAxis.setTickLabelFormatter(new NumberAxis.DefaultFormatter(yAxis) {
+            @Override public String toString(Number n) {
+                return String.valueOf(n.longValue());
+            }
+        });
+
+        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
+        chart.setTitle("Handwriting Style Distribution");
+        chart.setLegendVisible(false);
+        chart.setPrefHeight(320);
+
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.getData().add(new XYChart.Data<>("PRINT",   print));
+        series.getData().add(new XYChart.Data<>("CURSIVE", cursive));
+        series.getData().add(new XYChart.Data<>("MIXED",   mixed));
+        chart.getData().add(series);
+
+        // Apply custom bar colours once the chart is part of a live scene
+        chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                chart.lookupAll(".data0.chart-bar")
+                     .forEach(node -> node.setStyle("-fx-bar-fill:" + PRINT_COL   + ";"));
+                chart.lookupAll(".data1.chart-bar")
+                     .forEach(node -> node.setStyle("-fx-bar-fill:" + CURSIVE_COL + ";"));
+                chart.lookupAll(".data2.chart-bar")
+                     .forEach(node -> node.setStyle("-fx-bar-fill:" + MIXED_COL   + ";"));
+            }
+        });
+
+        return chart;
+    }
+
+    /**
+     * Builds a three-column showing each student's name,
+     * style tag, and similarity score formatted as a percentage.
+     *
+     * @param results classification results to populate the table
+     * @return a ready-to-display
+     */
+    private TableView<String[]> buildTable(StyleOutput[] results) {
+        TableView<String[]> table = new TableView<>();
+        table.setPrefHeight(250);
+
+        TableColumn<String[], String> nameCol = new TableColumn<>("Student");
+        nameCol.setCellValueFactory(c ->
+            new javafx.beans.property.SimpleStringProperty(c.getValue()[0]));
+        nameCol.setPrefWidth(200);
+
+        TableColumn<String[], String> styleCol = new TableColumn<>("Style");
+        styleCol.setCellValueFactory(c ->
+            new javafx.beans.property.SimpleStringProperty(c.getValue()[1]));
+        styleCol.setPrefWidth(120);
+
+        TableColumn<String[], String> simCol = new TableColumn<>("Similarity");
+        simCol.setCellValueFactory(c ->
+            new javafx.beans.property.SimpleStringProperty(c.getValue()[2]));
+        simCol.setPrefWidth(100);
+
+        table.getColumns().addAll(nameCol, styleCol, simCol);
+
+        for (StyleOutput r : results) {
+            if (r == null) continue;
+            table.getItems().add(new String[]{
+                r.getStudentname(),
+                r.getTag(),
+                String.format("%.0f%%", r.getSimilarityScore())
+            });
+        }
+
+        return table;
+    }
+    
+    /**
+     * Min-max normalises all five raw feature values from a student's graph to
+     * the range [0, 100] for use in progress bars and node graphs.
+     *
+     * @param graph the student's {@link HandwritingGraph}
+     * @return five normalised scores in {@link #FEATURE_KEYS} order
+     */
+    private double[] normalise(HandwritingGraph graph) {
+        double[] out = new double[FEATURE_KEYS.length];
+        for (int i = 0; i < FEATURE_KEYS.length; i++) {
+            double val = getFeature(graph, FEATURE_KEYS[i]);
+            out[i] = Math.max(0, Math.min(100,
+                (val - FEAT_MIN[i]) / (FEAT_MAX[i] - FEAT_MIN[i]) * 100));
+        }
+        return out;
+    }
+
+    /**
+     * Iterates the graph's nodes and returns the value of the
+     * first node whose feature name matches 
+     * Returns  if no match is found.
+     *
+     * @param graph the student's
+     * @param name  feature name to find
+     * @return the raw feature value, or  if absent
+     */
+    private double getFeature(HandwritingGraph graph, String name) {
+        for (int i = 0; i < graph.getNodeCount(); i++) {
+            FeatureNode node = graph.getNode("N" + (i + 1));
+            if (node != null && node.getFeatureName().equals(name))
+                return node.getValue();
+        }
+        return 0.0;
+    }
+
+    /**
+     * Returns the pill background colour for a style badge.
+     *
+     * @param style the classified handwriting style
+     * @return CSS hex colour string
+     */
+    private String badgeBgColor(HandwritingStyle style) {
+        return switch (style) {
+            case PRINT_BLOCK -> "#dbeafe";
+            case CURSIVE     -> "#ede9fe";
+            default          -> "#fef3c7";
+        };
+    }
+
+    /**
+     * Returns the text colour for a style badge pill.
+     *
+     * @param style the classified handwriting style
+     * @return CSS hex colour string
+     */
+    private String badgeTextColor(HandwritingStyle style) {
+        return switch (style) {
+            case PRINT_BLOCK -> "#1e40af";
+            case CURSIVE     -> "#5b21b6";
+            default          -> "#92400e";
+        };
+    }
+
+    /**
+     * Converts a JavaFX  to a lowercase CSS hex string
+     * @param c the colour to convert
+     * @return a 7-character hex colour string including the leading 
+     */
+    private String toHex(Color c) {
+        return String.format("#%02x%02x%02x",
+            (int)(c.getRed()   * 255),
+            (int)(c.getGreen() * 255),
+            (int)(c.getBlue()  * 255));
+    }
+}package ui;
+
+import algorithm.FeatureExtractor;
+import algorithm.GraphSimilarity;
+import database.StudentDatabase;
+import model.HandwritingGraph;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
+import java.io.File;
+
+/**
+ * Second UI Interface - Document Matcher
+ * Allows uploading a suspect document and matching against database
+ */
+public class UploadView extends BorderPane {
+    
+    private StudentDatabase db;
+    private FeatureExtractor extractor;
+    private GraphSimilarity similarity;
+    private ImageView imagePreview;
+    private TextArea resultArea;
+    private Label fileNameLabel;
+    private File selectedFile;
+    
+    public UploadView() {
+        db = StudentDatabase.getInstance();
+        extractor = new FeatureExtractor();
+        similarity = new GraphSimilarity();
+        
+        setupUI();
+    }
+    
+    private void setupUI() {
+        // Title
+        Label title = new Label("Handwriting Analysis - Document Matcher");
+        title.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        
+        // Upload area
+        VBox uploadArea = createUploadArea();
+        
+        // Image preview
+        imagePreview = new ImageView();
+        imagePreview.setFitWidth(300);
+        imagePreview.setFitHeight(200);
+        imagePreview.setPreserveRatio(true);
+        imagePreview.setStyle("-fx-border-color: #ccc; -fx-border-width: 2;");
+        
+        // Analyze button
+        Button btnAnalyze = new Button("Analyze Handwriting");
+        btnAnalyze.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+        btnAnalyze.setOnAction(e -> analyzeDocument());
+        
+        // Results area
+        resultArea = new TextArea();
+        resultArea.setEditable(false);
+        resultArea.setPrefHeight(200);
+        resultArea.setPromptText("Analysis results will appear here...");
+        
+        // Layout
+        HBox previewBox = new HBox(20, uploadArea, imagePreview);
+        previewBox.setAlignment(Pos.CENTER);
+        
+        VBox centerBox = new VBox(20, previewBox, btnAnalyze, resultArea);
+        centerBox.setPadding(new Insets(20));
+        
+        setTop(title);
+        setCenter(centerBox);
+        setPadding(new Insets(10));
+    }
+    
+    private VBox createUploadArea() {
+        VBox box = new VBox(10);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(20));
+        box.setStyle("-fx-border-color: #ccc; -fx-border-width: 2; -fx-border-style: dashed;");
+        
+        Label dragLabel = new Label("Drag & Drop or Click to Upload");
+        dragLabel.setStyle("-fx-font-size: 14px;");
+        
+        fileNameLabel = new Label("No file selected");
+        fileNameLabel.setStyle("-fx-text-fill: #666;");
+        
+        Button btnBrowse = new Button("Browse Files");
+        btnBrowse.setOnAction(e -> browseFile());
+        
+        box.getChildren().addAll(dragLabel, fileNameLabel, btnBrowse);
+        
+        // Drag and drop support
+        box.setOnDragOver(event -> {
+            if (event.getDragboard().hasFiles()) {
+                event.acceptTransferModes(javafx.scene.input.TransferMode.ANY);
+            }
+            event.consume();
+        });
+        
+        box.setOnDragDropped(event -> {
+            var files = event.getDragboard().getFiles();
+            if (files != null && !files.isEmpty()) {
+                handleFile(files.get(0));
+            }
+            event.setDropCompleted(true);
+            event.consume();
+        });
+        
+        return box;
+    }
+    
+    private void browseFile() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Handwriting Image");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.bmp")
+        );
+        
+        File file = fileChooser.showOpenDialog(null);
+        if (file != null) {
+            handleFile(file);
+        }
+    }
+    
+    private void handleFile(File file) {
+        selectedFile = file;
+        fileNameLabel.setText(file.getName());
+        
+        // Load and display image
+        try {
+            Image image = new Image("file:" + file.getAbsolutePath());
+            imagePreview.setImage(image);
+        } catch (Exception e) {
+            imagePreview.setImage(null);
+            resultArea.setText("Error loading image: " + e.getMessage());
+        }
+    }
+    
+    private void analyzeDocument() {
+        if (selectedFile == null) {
+            showAlert("No File", "Please upload a handwriting sample first.");
+            return;
+        }
+        
+        if (db.getStudentCount() == 0) {
+            showAlert("No Data", "No students in database. Please add students first.");
+            return;
+        }
+        
+        resultArea.setText("Analyzing handwriting...\n");
+        
+        try {
+            // Extract features from suspect document
+            resultArea.appendText("1. Extracting features from document...\n");
+            HandwritingGraph suspectGraph = extractor.extractFeatures(
+                selectedFile.getAbsolutePath(), "SUSPECT");
+            
+            resultArea.appendText(String.format("   Extracted %d features\n", suspectGraph.getNodeCount()));
+            
+            // Display extracted features
+            resultArea.appendText("\n2. Extracted Features:\n");
+            for (var node : suspectGraph.getAllNodes()) {
+                resultArea.appendText(String.format("   • %s: %.2f\n", 
+                    node.getFeatureName(), node.getValue()));
+            }
+            
+            // Compare with all students
+            resultArea.appendText("\n3. Comparing with database students:\n");
+            
+            String[] studentIds = db.getAllStudentIds();
+            HandwritingGraph[] studentGraphs = new HandwritingGraph[studentIds.length];
+            String[] studentNames = new String[studentIds.length];
+            
+            for (int i = 0; i < studentIds.length; i++) {
+                studentGraphs[i] = db.getStudentGraph(studentIds[i]);
+                studentNames[i] = db.getStudentName(studentIds[i]);
+            }
+            
+            GraphSimilarity.MatchResult result = similarity.findBestMatch(
+                suspectGraph, studentGraphs, studentNames, studentIds);
+            
+            resultArea.appendText("\n4. Results:\n");
+            resultArea.appendText("   ─────────────────────────────\n");
+            
+            if (result != null) {
+                resultArea.appendText(String.format(
+                    "   ✓ MATCH FOUND!\n\n" +
+                    "   Student ID: %s\n" +
+                    "   Student Name: %s\n" +
+                    "   Confidence: %.1f%%\n",
+                    result.getStudentId(),
+                    result.getStudentName(),
+                    result.getSimilarityScore() * 100
+                ));
+                
+                // Provide interpretation
+                if (result.getSimilarityScore() > 0.8) {
+                    resultArea.appendText("\n   High confidence match - Strong evidence\n");
+                } else if (result.getSimilarityScore() > 0.6) {
+                    resultArea.appendText("\n   Moderate confidence - Further verification recommended\n");
+                } else {
+                    resultArea.appendText("\n   Low confidence - Not a strong match\n");
+                }
+            } else {
+                resultArea.appendText("   No match found in database\n");
+            }
+            
+            resultArea.appendText("\n   ─────────────────────────────\n");
+            
+        } catch (Exception e) {
+            resultArea.appendText("\nError during analysis: " + e.getMessage() + "\n");
+            e.printStackTrace();
+        }
+    }
+    
+    private void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+}package images;
+public class GrayScaleImage extends AbstractImage<Double> {
+	public GrayScaleImage(int width, int height, String name) {
+		super(width, height, name);
+		for(int y = 0; y < super.getHeight(); y++) {
+			for(int x = 0; x < super.getWidth(); x++) {
+				super.setPixel(x, y, 255.0);
+			}
+		}
+	}
+	
+
+	/**
+	 * 
+	 */
+	@Override
+	public String toPPM() {
+		StringBuilder sb = new StringBuilder();
+		
+		sb.append("P2\n");
+		sb.append(String.format("%s %s\n", super.getWidth(), super.getHeight()));
+		sb.append("255\n");
+		sb.append(toString());
+		
+		return sb.toString();
+	}
+}
+package images;
+
+public class BWImage extends AbstractImage<Integer> {
+
+	/** Number of ink (value=1) pixels */
+	private int numWhitePixels;
+
+	/**
+	 * Constructor
+	 * @param width  width of the image
+	 * @param height height of the image
+	 * @param name   file name of the image
+	 */
+	public BWImage(int width, int height, String name) {
+		super(width, height, name);
+	}
+
+	/**
+	 * Updates pixel at coordinates (x, y), keeping the ink-pixel count accurate.
+	 */
+	@Override
+	public void setPixel(int x, int y, Integer value) {
+		if (super.getPixel(x, y) != null && super.getPixel(x, y) == 1 && value == 0)
+			numWhitePixels--;
+		if (super.getPixel(x, y) == null || (super.getPixel(x, y) == 0 && value == 1))
+			numWhitePixels++;
+		super.setPixel(x, y, value);
+	}
+
+	/**
+	 * Returns the number of ink pixels (value == 1).
+	 */
+	public int getNumWhitePixels() {
+		return numWhitePixels;
+	}
+
+	/**
+	 * Returns a new BWImage with all pixel values flipped (0→1, 1→0).
+	 * Useful for correcting images where ink and background are swapped.
+	 */
+	public BWImage invertPixels() {
+		BWImage inverted = new BWImage(super.getWidth(), super.getHeight(), super.getName());
+		for (int y = 0; y < super.getHeight(); y++)
+			for (int x = 0; x < super.getWidth(); x++)
+				inverted.setPixel(x, y, super.getPixel(x, y) ^ 1);
+		return inverted;
+	}
+
+	/**
+	 * Returns a PPM (P2 greyscale) representation of this image.
+	 */
+	@Override
+	public String toPPM() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("P2\n");
+		sb.append(String.format("%s %s\n", super.getWidth(), super.getHeight()));
+		sb.append("1\n");
+		sb.append(toString());
+		return sb.toString();
+	}
+}package images;
+
+public abstract class AbstractImage<T> {
+	protected T[][] pixels;
+	private int width;
+	private int height;
+	private String name;
+	
+	/**
+	 * Constructor
+	 * @param width width of the image
+	 * @param height height of the image
+	 * @param name file name of the image
+	 */
+	public AbstractImage(int width, int height, String name) {
+		this.width = width;
+		this.height = height;
+		this.name = name;
+		pixels = (T[][])new Object[width][height];
+	}
+	
+	/**
+	 * @return the filename of the image
+	 */
+	public String getName() {
+		return name;
+	}
+	
+	/**
+	 * Accessor for the image width
+	 * @return width of the image
+	 */
+	public int getWidth() {
+		return width;
+	}
+	
+	/**
+	 * Accessor for the image height
+	 * @return height of the image
+	 */
+	public int getHeight() {
+		return height;
+	}
+	
+	/**
+	 * Accessor for a pixel at a specific location
+	 * @param x x coordinate of the pixel
+	 * @param y y coordinate of the pixel
+ 	 * @return the pixel at (x, y)
+	 */
+	public T getPixel(int x, int y) {
+		return pixels[x][y];
+	}
+	
+	/**
+	 * Returns a PPM version of the image
+	 * @return a string containing a ppm representation of the image.
+	 */
+	public abstract String toPPM();
+	
+	
+	/**
+	 * sets a new pixel value for pixel located at coordinates (x, y)
+	 * @param x the x coordinate of the pixel
+	 * @param y the y coordinate of the pixel
+	 * @param pixel the RGB pixel located at (x, y)
+	 */
+	public void setPixel(int x, int y, T pixelVal) {
+		pixels[x][y] = pixelVal;
+	}
+	
+	
+	/**
+	 * returns a string containing the pixel values of the image
+	 * @return a string representation of the pixels array
+	 */
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		for(int y = 0; y < height; y++) {
+			for(int x = 0; x < width; x++) {
+				if(pixels[x][y] != null)
+					sb.append(String.format("%s ", pixels[x][y].toString()));
+			}
+			sb.append("\n");
+		}
+		return sb.toString();
+	}
+}
+package images;
+
+public class RGBPixel {
+	private double red;
+	private double green;
+	private double blue;
+	
+	public RGBPixel(double red, double green, double blue) {
+		this.red = red;
+		this.green = green;
+		this.blue = blue;
+	}
+	
+	
+	
+	
+	/**
+	 * @return the red
+	 */
+	public double getRed() {
+		return red;
+	}
+
+
+
+
+	/**
+	 * @param red the red to set
+	 */
+	public void setRed(double red) {
+		this.red = red;
+	}
+
+
+
+
+	/**
+	 * @return the green
+	 */
+	public double getGreen() {
+		return green;
+	}
+
+
+
+
+	/**
+	 * @param green the green to set
+	 */
+	public void setGreen(double green) {
+		this.green = green;
+	}
+
+
+
+
+	/**
+	 * @return the blue
+	 */
+	public double getBlue() {
+		return blue;
+	}
+
+
+
+
+	/**
+	 * @param blue the blue to set
+	 */
+	public void setBlue(double blue) {
+		this.blue = blue;
+	}
+
+	public double getAverage() {
+		return (red + green + blue) / 3;
+	}
+
+
+	@Override
+	public String toString() {
+		return String.format("%s %s %s ", red, green, blue);
+	}
+	
+
+}
+package images;
+
+import javafx.scene.image.Image;
+
+public class RGBImage extends AbstractImage<RGBPixel> {
+
+	/**
+	 * Constructs an RGBImage from a JavaFX Image.
+	 * @param image     JavaFX source image
+	 * @param imageName file name of the image
+	 */
+	public RGBImage(Image image, String imageName) {
+		super((int) image.getWidth(), (int) image.getHeight(), imageName);
+		for (int y = 0; y < super.getHeight(); y++)
+			for (int x = 0; x < super.getWidth(); x++) {
+				double red   = image.getPixelReader().getColor(x, y).getRed()   * 255;
+				double green = image.getPixelReader().getColor(x, y).getGreen() * 255;
+				double blue  = image.getPixelReader().getColor(x, y).getBlue()  * 255;
+				super.setPixel(x, y, new RGBPixel(red, green, blue));
+			}
+	}
+
+	/**
+	 * Constructs a blank RGBImage filled with white pixels.
+	 * Used when building output images programmatically (e.g. coloured skeleton overlays).
+	 * @param width     image width in pixels
+	 * @param height    image height in pixels
+	 * @param imageName file name / label for this image
+	 */
+	public RGBImage(int width, int height, String imageName) {
+		super(width, height, imageName);
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				super.setPixel(x, y, new RGBPixel(255, 255, 255));
+	}
+
+	/**
+	 * Returns a PPM (P3 colour) representation of this image.
+	 */
+	@Override
+	public String toPPM() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("P3\n");
+		sb.append(String.format("%s %s\n", super.getWidth(), super.getHeight()));
+		sb.append("255\n");
+		sb.append(toString());
+		return sb.toString();
+	}
+}package classification;
+
+import java.util.List;
+import model.HandwritingGraph;
+import model.FeatureNode;
+
+/**
+ * Classifies handwriting graphs into PRINT_BLOCK, CURSIVE, or MIXED.
+ *Trained GNN (GNNClassifier) using W1.csv and W2.csv weights.
+ *Rule-based classifier triggered automatically if GNN fails.
+ */
+public class Classifier {
+
+    // Rule-based fallback constants
+    private static final double maxCursive      = 9.5;
+    private static final double minCursive      = 7.5;
+    private static final double minPrint        = 5.0;
+    private static final double maxPrint        = 5.5;
+    private static final double slantMaxCursive = 108.0;
+    private static final double slantPrintMin   = 75.0;
+    private static final double slantPrintMax   = 110.0;
+    private static final double highPressure    = 65.0;
+    private static final double tightSpacing    = 9.0;
+    private static final double wideSpacing     = 22.0;
+
+    /**
+     * Classifies the students using the Trained GNN USING W1.CSV and W2.csv/ rule based classification and refines the scores by use of a GNN
+     * The Gnn adjusts the results based on hpw similar the neighbouring student features are 
+     * @param studentIds - list of the student IDs
+     * @param names - student names 
+     * @param graphs -graphs of each student
+     * @param edges -list to adjust the scores 
+     * @return = styles with GNN adjustments 
+     */
+    public static StyleOutput[] classifyBatchGNN(List<String> studentIds,List<String> names,List<HandwritingGraph> graphs,List<int[]> edges) {
+    	// classify each student individually using ONNX/rule-based
+    	StyleOutput[] results = new StyleOutput[graphs.size()];
+        // GNN classification 
+        try {
+            GNNClassifier gnn = new GNNClassifier();
+            HandwritingStyle[] gnnStyles = gnn.classifyBatch(graphs, edges);
+            float[][] embeddings = gnn.getLastEmbeddings();
+
+            for (int i = 0; i < graphs.size(); i++) {
+                HandwritingStyle style = gnnStyles[i];
+                float[] emb = embeddings[i]; // [PRINT, CURSIVE, MIXED]
+
+                // GNN confidence for the predicted class
+                float gnnConfidence = switch (style) {
+                case CURSIVE     -> emb[0];
+                case MIXED       -> emb[1];
+                default          -> emb[2]; // PRINT_BLOCK
+                };
+
+                int confidence = Math.round(gnnConfidence * 100);
+                int cursiveScore = Math.round(emb[0] * 100);
+                int mixedScore   = Math.round(emb[1] * 100);
+                int printScore   = Math.round(emb[2] * 100);
+
+                StyleOutput result = new StyleOutput(
+                    studentIds.get(i), names.get(i),
+                    style, printScore, cursiveScore
+                );
+                result.setSimilarityScore(confidence);
+
+                System.out.println("[GNN] " + names.get(i)
+                    + " → " + style + " | confidence: " + confidence + "%");
+
+                results[i] = result;
+            }
+
+            return results; 
+
+        } catch (Exception e) {
+            System.err.println("[Classifier] GNN failed — falling back to rule-based. "
+                + e.getMessage());
+        }
+
+        //Fallback: rule-based per student 
+        for (int i = 0; i < graphs.size(); i++) {
+            results[i] = buildResultRuleBased(
+                studentIds.get(i), names.get(i), graphs.get(i));
+        }
+
+    	return results;
+}
+
+    /**
+     * Rule based classification to fall back on oncve the model fails 
+     * @param studentId unique identifier
+     * @param name - name of students
+     * @param graph - graph with feature nodes
+     * @return StyleOutput with the handwriting style and the scores 
+     */
+    private static StyleOutput buildResultRuleBased(String studentId,String name,HandwritingGraph graph) {
+        
+    	HandwritingStyle style = classify(graph);
+        int[]            sc    = calculateScores(graph, style);
+        int printScore         = sc[0];
+        int cursiveScore       = sc[1];
+
+        StyleOutput result = new StyleOutput(studentId, name, style, printScore, cursiveScore);
+
+        //similarity for rule based 
+        double similarityScore;
+        switch (style) {
+            case PRINT_BLOCK:
+                similarityScore = printScore;
+                break;
+            case CURSIVE:
+                similarityScore = cursiveScore;
+                break;
+            default:
+                similarityScore = (printScore + cursiveScore) / 2.0;
+                break;
+        }
+
+        result.setSimilarityScore(similarityScore);
+        System.out.println("[Classifier] Rule-based predicted: " + style
+                         + " | similarity: " + similarityScore + "%");
+        return result;
+    }
+
+ /**
+  * Determines the handwriting style based on the scores of each priority be ut cursive , print  or mixed 
+  * @param graph HandwritingGrapg  containing the feature nodes 
+  * @return HandwritingStyle  enum values 
+  */
+    public static HandwritingStyle classify(HandwritingGraph graph) {
+        try {
+            double slant    = getFeature(graph, "SlantAngle");
+            double spacing  = getFeature(graph, "LetterSpacing");
+            double loops    = getFeature(graph, "LoopFrequency");
+            double pressure = getFeature(graph, "PressureZone");
+
+            if (loops > maxCursive && slant > slantMaxCursive)
+                return HandwritingStyle.CURSIVE;
+            if (loops < maxPrint && slant >= 78 && slant <= 105)
+                return HandwritingStyle.PRINT_BLOCK;
+            if (loops >= minPrint && loops <= maxCursive
+                    && slant >= 80 && slant <= 115)
+                return HandwritingStyle.MIXED;
+            if (loops > 9.0 && slant >= slantPrintMin
+                    && slant <= slantMaxCursive)
+                return HandwritingStyle.MIXED;
+            if (loops < 6.0 && slant > 115)
+                return HandwritingStyle.MIXED;
+            if ((spacing < tightSpacing || spacing > wideSpacing)
+                    && loops >= 5.0 && loops <= 10.0)
+                return HandwritingStyle.MIXED;
+            if (pressure > highPressure && loops >= 5.0 && loops <= 9.0)
+                return HandwritingStyle.MIXED;
+            if (loops > minCursive)
+                return HandwritingStyle.CURSIVE;
+            if (loops < minPrint
+                    && slant >= slantPrintMin && slant <= slantPrintMax)
+                return HandwritingStyle.PRINT_BLOCK;
+
+            return HandwritingStyle.MIXED;
+
+        } catch (IllegalArgumentException e) {
+        	// if a feature is missing from the graph 
+            System.err.println("Missing features: " + e.getMessage());
+            return HandwritingStyle.MIXED;
+        }
+    }
+
+   /**
+    * Calculates the scores based on how strongly rge features align with each handwriting style
+    * Print signals:   few loops, wide spacing, upright slant, light pressure, low density
+    * Cursive signals: many loops, tight spacing, forward slant, heavy pressure, high density
+    * @param graph HandwritingGraph containing the 5 feature nodes
+    * @param style the styles of the handwriting 
+    * @return the scores of each handwriting feature
+    */
+    private static int[] calculateScores(HandwritingGraph graph,HandwritingStyle style) {
+        try {
+        	
+            double loops    = getFeature(graph, "LoopFrequency");
+            double slant    = getFeature(graph, "SlantAngle");
+            double spacing  = getFeature(graph, "LetterSpacing");
+            double pressure = getFeature(graph, "PressureZone");
+            double density  = getFeature(graph, "StrokeDensity");
+
+            //features that influence the PRINT score
+            int printSignals = 0;
+            if (loops < 4.0)                  printSignals++;
+            if (spacing > 18.0)               printSignals++;
+            if (slant >= 75 && slant <= 105)  printSignals++;
+            if (pressure < 40.0)              printSignals++;
+            if (density < 2.5)                printSignals++;
+
+            //features that influence the cursive score 
+            int cursiveSignals = 0;
+            if (loops > 8.0)                  cursiveSignals++;
+            if (slant > 105.0)                cursiveSignals++;
+            if (spacing < 12.0)               cursiveSignals++;
+            if (pressure > 55.0)              cursiveSignals++;
+            if (density > 4.0)                cursiveSignals++;
+
+            int printScore, cursiveScore;
+            if (style == HandwritingStyle.PRINT_BLOCK) {
+                printScore   = Math.min(100, 60 + (printSignals * 10));
+                cursiveScore = Math.max(0, 100 - printScore);
+            } else if (style == HandwritingStyle.CURSIVE) {
+                cursiveScore = Math.min(100, 60 + (cursiveSignals * 10));
+                printScore   = Math.max(0, 100 - cursiveScore);
+            } else {
+                printScore   = 40 + (printSignals * 5);
+                cursiveScore = 40 + (cursiveSignals * 5);
+            }
+
+            printScore   = Math.max(0, Math.min(100, printScore));
+            cursiveScore = Math.max(0, Math.min(100, cursiveScore));
+            return new int[]{printScore, cursiveScore};
+
+        } catch (IllegalArgumentException e) {
+            System.err.println("Missing feature in scoring: " + e.getMessage());
+            return new int[]{50, 50};
+        }
+    }
+
+
+    /**
+     * Extracts a feature value by name. Throws if not found.
+     * @param graph the HandwritingGraph to search
+     * @param featureName exact feature to match
+     * @return value of the faeture node
+     */
+    private static double getFeature(HandwritingGraph graph,String featureName) {
+        FeatureNode node = findNode(graph, featureName);
+        if (node == null) throw new IllegalArgumentException(featureName);
+        return node.getValue();
+    }
+
+    /**
+     * Searches the graph for a node matching featureName.
+     * @param graph        the HandwritingGraph to search
+     * @param featureName  the feature name to match
+     * @return             the matching FeatureNode, or null if not found
+     */
+    private static FeatureNode findNode(HandwritingGraph graph,String featureName) {
+        for (int i = 0; i < graph.getNodeCount(); i++) {
+            String nodeId = "N" + (i + 1);
+            FeatureNode node = graph.getNode(nodeId);
+            if (node != null
+                    && node.getFeatureName().equals(featureName)) {
+                return node;
+            }
+        }
+        return null;
+    }
+}package classification;
+/**
+ * The 3 main categories that the handwritings will be classified into 
+ * 1.Print - a non-connected style that focuses on precise ,careful strokes
+ * 2.Cursive - has excessive loops and heavily connected letters 
+ * 3.Mixed Print-Cursive - combination of the print and cursive characters 
+ */
+public enum HandwritingStyle {
+
+	/**
+	 * The types of handwritings
+	 */
+	PRINT_BLOCK("Non-connected Writing"), 
+	CURSIVE("Connected Writing"),
+	MIXED("Mixed Print-Cursive");
+	
+	//the type of the handwriting
+	private final String type ;
+
+	//Constructor for the class 
+	HandwritingStyle(String type) {
+		
+		this.type = type;
+	}
+	
+	/**
+	 * Gets the type of handwriting style
+	 * @return type Ctaegory the handwriting falls into
+	 */
+	public String getType() {
+		return type;
+	}
+	
+}
+package classification;
+/**
+ * 
+ */
+public class StyleOutput {
+	//unique identifier for the student
+    private final String studentId;
+    //student's full name
+    private final String studentname;
+    //the type of handwriting style
+    private final HandwritingStyle style;  
+    //score representing how strongly the handwriting is Print
+    private final int print_blockScore;
+    //score representing how strongly the handwriting is Cursive 
+    private final int cursiveScore;
+    //stores the similarity
+    private double similarityScore ;
+
+    // Constructor
+    public StyleOutput(String studentId, String studentname,HandwritingStyle style, int print_blockScore, int cursiveScore) {
+        this.studentId = studentId;
+        this.studentname = studentname;
+        this.style = style;
+        this.print_blockScore = print_blockScore;
+        this.cursiveScore = cursiveScore;
+    }
+
+
+    // Getters
+
+    /**
+     * Returns the student's full name 
+     * @return studentname - name of student
+     */
+    public String getStudentname() {
+        return studentname;
+    }
+
+    /**
+     * Returns the type of handwriting style
+     * @return style  Print_BLOCK ,CURSIVE or MIXED 
+     */
+    public HandwritingStyle getStyle() {
+        return style;
+    }
+
+    /**
+     * Short uppercase tag for table cells and badge labels
+     */
+    public String getTag() {
+        switch (style) {
+            case PRINT_BLOCK: return "PRINT";
+            case CURSIVE:     return "CURSIVE";
+            default:          return "MIXED";
+        }
+    }
+
+    
+    /**
+     * Returns the similarity score calculated during classification
+     * Value is between 0.0 (no match) and 100.0 (perfect match)
+     * @return similarity percentage 0.0 - 100.0
+     */
+    public double getSimilarityScore() {
+        return this.similarityScore;
+    }
+
+    /**
+     * Sets the similarity score after classification is complete
+     * @param similarityScore value between 0.0 and 100.0
+     */
+    public void setSimilarityScore(double similarityScore) {
+     
+        this.similarityScore = Math.max(0.0, Math.min(100.0, similarityScore));
+    }
+    
+    @Override
+    public String toString() {
+        return String.format(
+            "ClassificationResult{id=%s, style=%s, printScore=%d, cursiveScore=%d}",
+            studentId, style, print_blockScore, cursiveScore);
+    }
+}package classification;
+
+import model.HandwritingGraph;
+import model.FeatureNode;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.*;
+/**
+ * GNN classifier for handwriting style classification
+ * Each student is a node whose handwriting features are similar hence influencing each other's classication
+ * Trained weights are loaded from W1.csv [16x5] and W2.csv [3x16],
+ * exported from a PyTorch GCN trained to 96.04% accuracy on labelled
+ * handwriting data (CURSIVE, MIXED, PRINT_BLOCK).
+ */
+public class GNNClassifier {
+
+	//Trained weight matrices loaded from CSV
+    private float[][] W1; // [16][5]
+    private float[][] W2; // [3][16]
+    //stored oputputs from last classifyBatch() call
+    private float[][] lastEmbeddings = null;  // stores Z after classifyBatch
+    private float[][] lastH1         = null;  // stores H1 (hidden layer)
+    
+
+    private static final String[] LABELS = {"CURSIVE", "MIXED", "PRINT_BLOCK"};
+    
+    /**
+     * Constructs the GNNClassifier by loading the trained weights from CSV files 
+     */
+    public GNNClassifier() {
+        W1 = loadMatrix("W1.csv");
+        W2 = loadMatrix("W2.csv");
+    }
+
+    /**
+     * Loads a weight matrix from a CSV file.
+     * @param filename ath to the CSV file relative to the working directory
+     * @return 2D float array representing the weight matrix
+     */
+    private float[][] loadMatrix(String filename) {
+        try {
+            List<float[]> rows = new ArrayList<>();
+            BufferedReader br = new BufferedReader(new FileReader(filename));
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",");
+                float[] row = new float[parts.length];
+                for (int j = 0; j < parts.length; j++)
+                    row[j] = Float.parseFloat(parts[j].trim());
+                rows.add(row);
+            }
+            br.close();
+            return rows.toArray(new float[0][]);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load weights: " + filename, e);
+        }
+    }
+
+    /**
+     * Run 2-layer GCN over a batch of student graphs.
+     * graphs[i] = one student, edges connect similar students.
+     * @param graphs list of HandwritingGraphs — one per student
+     * @param edges pairs defining kNN connections between students
+     * @return Returns predicted style index for each student.
+     */
+    public HandwritingStyle[] classifyBatch(List<HandwritingGraph> graphs,
+    		List<int[]> edges) {
+    	int N = graphs.size();
+    	float[][] H = buildFeatureMatrix(graphs, N);
+    	float[][] A = buildAdjacency(N, edges);
+
+    	float[][] AH  = matMul(A, H);
+    	float[][] H1  = matMul(AH, transpose(W1));
+    	relu(H1);
+
+    	float[][] AH1 = matMul(A, H1);
+    	float[][] Z   = matMul(AH1, transpose(W2));
+    	softmaxRows(Z);
+
+    	HandwritingStyle[] results = new HandwritingStyle[N];
+    	for (int i = 0; i < N; i++) {
+    		int best = argmax(Z[i]);
+    		results[i] = HandwritingStyle.valueOf(LABELS[best]);
+    	}
+
+    	this.lastEmbeddings = Z;
+    	this.lastH1         = H1;
+    	return results;
+    }
+
+    /**
+     * Extract feature matrix from list of graphs — [N][5]
+     * @param graphs list of student HandwritingGraphs
+     * @param N number of students
+     * @return normalised feature matrix
+     */
+    private float[][] buildFeatureMatrix(List<HandwritingGraph> graphs, int N) {
+        String[] feats = {"SlantAngle","LoopFrequency","LetterSpacing","PressureZone","StrokeDensity"};
+        float[][] H = new float[N][5];
+        for (int i = 0; i < N; i++) {
+            HandwritingGraph g = graphs.get(i);
+            for (int j = 0; j < feats.length; j++) {
+                FeatureNode node = findNode(g, feats[j]);
+                H[i][j] = node != null ? (float) node.getValue() : 0f;
+            }
+        }
+        return normalize(H); 
+    }
+
+
+    /**
+     * Build symmetrically normalised adjacency matrix from edge list
+     * @param N     number of student nodes in the graph
+     * @param edges list of undirected [i,j] edge pairs from kNN construction
+     * @return      symmetrically normalised adjacency matrix [N][N]
+     */
+    private float[][] buildAdjacency(int N, List<int[]> edges) {
+        float[][] A = new float[N][N];
+        // Add self-loops (A + I)
+        for (int i = 0; i < N; i++) A[i][i] = 1f;
+        for (int[] e : edges) {
+            A[e[0]][e[1]] = 1f;
+            A[e[1]][e[0]] = 1f; // undirected
+        }
+        // D^-0.5 normalisation
+        float[] deg = new float[N];
+        for (int i = 0; i < N; i++)
+            for (int j = 0; j < N; j++) deg[i] += A[i][j];
+        for (int i = 0; i < N; i++)
+            for (int j = 0; j < N; j++)
+                A[i][j] /= (float)(Math.sqrt(deg[i]) * Math.sqrt(deg[j]));
+        return A;
+    }
+
+    /**
+     * Matrix multiplication
+     * @param A matrix of size [m][k]
+     * @param B matrix of size [k][n]
+     * @return result matrix C of size [m][n]
+     */
+    private float[][] matMul(float[][] A, float[][] B) {
+        int m=A.length, k=A[0].length, n=B[0].length;
+        float[][] C = new float[m][n];
+        for(int i=0;i<m;i++) for(int j=0;j<n;j++)
+            for(int l=0;l<k;l++) C[i][j] += A[i][l]*B[l][j];
+        return C;
+    }
+    /**
+     * Transposes a matrix M of size [r][c] to [c][r].
+     * @param M weight matrice
+     * @return result
+     */
+    private float[][] transpose(float[][] M) {
+        float[][] T = new float[M[0].length][M.length];
+        for(int i=0;i<M.length;i++) for(int j=0;j<M[0].length;j++) T[j][i]=M[i][j];
+        return T;
+    }
+    
+    
+    public float[][] getLastEmbeddings() { return lastEmbeddings; }
+    /**
+     * Applies ReLU activation in-place: replaces all negative values with 0.
+     * @param M  matrix to apply ReLU to 
+     */
+    private void relu(float[][] M) {
+        for(float[] r:M) 
+        	for(int j=0;j<r.length;j++) 
+        		r[j]=Math.max(0,r[j]);
+    }
+    
+    /**
+     * Uses max-subtraction for numerical stability.
+     * @param M matrix of logits
+     */
+    private void softmaxRows(float[][] M) {
+        for(float[] r:M) {
+            float max=r[0]; for(float v:r) if(v>max) max=v;
+            float sum=0; for(int j=0;j<r.length;j++){r[j]=(float)Math.exp(r[j]-max);sum+=r[j];}
+            for(int j=0;j<r.length;j++) r[j]/=sum;
+        }
+    }
+    /**
+     * Returns the index of the maximum value in a float array.
+     * Used to determine the predicted class from softmax output.
+     *
+     * @param v float array of class probabilities
+     * @return index of the highest probability class
+     */
+    private int argmax(float[] v) {
+        int b=0; 
+        for(int i=1;i<v.length;i++) 
+        	if(v[i]>v[b]) b=i; 
+        return b;
+    }
+    
+    /**
+     * Z-score normalises each feature column of H in place.
+     * Ensures all features contribute equally regardless of raw scale.
+     * A small epsilon (1e-8) is added to std to prevent division by zero.
+     *
+     * @param H feature matrix [N][F] to normalise (modified in place)
+     * @return the normalised matrix H
+     */
+    private float[][] normalize(float[][] H) {
+        int N=H.length, F=H[0].length;
+        for(int j=0;j<F;j++) {
+            float sum=0,sq=0;
+            for(float[] r:H){sum+=r[j];sq+=r[j]*r[j];}
+            float mean=sum/N, std=(float)Math.sqrt(sq/N-mean*mean+1e-8f);
+            for(float[] r:H) r[j]=(r[j]-mean)/std;
+        }
+        return H;
+    }
+
+    /**
+     * Searches a HandwritingGraph for a FeatureNode matching the given name.
+     *
+     * @param g    the HandwritingGraph to search
+     * @param name the feature name to match 
+     * @return the matching FeatureNode, or null if not found
+     */
+    private FeatureNode findNode(HandwritingGraph g, String name) {
+        for(int i=0;i<g.getNodeCount();i++){
+            FeatureNode n=g.getNode("N"+(i+1));
+            if(n!=null && n.getFeatureName().equals(name)) return n;
+        }
+        return null;
+    }
+}package database;
+
+import algorithm.FeatureExtractor;
+import model.FeatureEdge;
+import model.FeatureNode;
+import model.HandwritingGraph;
+
+/**
+ * Singleton database holding all student records and their handwriting graphs.
+ * Uses parallel fixed-size arrays (no Java collections) as required.
+ */
+public class StudentDatabase {
+
+    private static final int MAX_STUDENTS = 100;
+    private static StudentDatabase instance;
+
+    private String[]          studentIds;
+    private String[]          studentNames;
+    private String[]          studentImagePaths;
+    private HandwritingGraph[] graphs;
+    private int               studentCount;
+
+    private StudentDatabase() {
+        studentIds        = new String[MAX_STUDENTS];
+        studentNames      = new String[MAX_STUDENTS];
+        studentImagePaths = new String[MAX_STUDENTS];
+        graphs            = new HandwritingGraph[MAX_STUDENTS];
+        studentCount      = 0;
+    }
+
+    public static StudentDatabase getInstance() {
+        if (instance == null) instance = new StudentDatabase();
+        return instance;
+    }
+
+    // =========================================================================
+    // CRUD
+    // =========================================================================
+
+    public boolean addStudent(String studentId, String name,
+                              String imagePath, HandwritingGraph graph) {
+        if (studentCount >= MAX_STUDENTS) {
+            System.out.println("Database full.");
+            return false;
+        }
+        if (studentExists(studentId)) {
+            System.out.println("Student " + studentId + " already exists.");
+            return false;
+        }
+        studentIds[studentCount]        = studentId;
+        studentNames[studentCount]      = name;
+        studentImagePaths[studentCount] = imagePath;
+        graphs[studentCount]            = graph;
+        studentCount++;
+        System.out.println("Student added: " + studentId);
+        return true;
+    }
+
+    public String getStudentName(String studentId) {
+        int i = findStudentIndex(studentId);
+        return i == -1 ? null : studentNames[i];
+    }
+
+    public HandwritingGraph getStudentGraph(String studentId) {
+        int i = findStudentIndex(studentId);
+        return i == -1 ? null : graphs[i];
+    }
+
+    public String[] getAllStudentIds() {
+        String[] ids = new String[studentCount];
+        for (int i = 0; i < studentCount; i++) ids[i] = studentIds[i];
+        return ids;
+    }
+
+    /**
+     * Returns all HandwritingGraphs in the same order as getAllStudentIds().
+     * Used by Main.refreshClassificationGraph() and GNNBridge.
+     */
+    public HandwritingGraph[] getAllGraphs() {
+        HandwritingGraph[] result = new HandwritingGraph[studentCount];
+        for (int i = 0; i < studentCount; i++) result[i] = graphs[i];
+        return result;
+    }
+
+    public boolean updateStudentName(String studentId, String newName) {
+        int i = findStudentIndex(studentId);
+        if (i == -1) { System.out.println("Student " + studentId + " not found."); return false; }
+        studentNames[i] = newName;
+        System.out.println("Student " + studentId + " name updated to: " + newName);
+        return true;
+    }
+
+    public boolean updateStudentImagePath(String studentId, String newPath) {
+        int i = findStudentIndex(studentId);
+        if (i == -1) { System.out.println("Student " + studentId + " not found."); return false; }
+        studentImagePaths[i] = newPath;
+        return true;
+    }
+
+    public boolean updateStudentNode(String studentId, String nodeId,
+                                     String newFeatureName, double newValue) {
+        int i = findStudentIndex(studentId);
+        if (i == -1) { System.out.println("Student " + studentId + " not found."); return false; }
+        return graphs[i].updateNode(nodeId, newFeatureName, newValue);
+    }
+
+    public boolean removeStudent(String studentId) {
+        int i = findStudentIndex(studentId);
+        if (i == -1) { System.out.println("Student " + studentId + " not found."); return false; }
+        for (int j = i; j < studentCount - 1; j++) {
+            studentIds[j]        = studentIds[j + 1];
+            studentNames[j]      = studentNames[j + 1];
+            studentImagePaths[j] = studentImagePaths[j + 1];
+            graphs[j]            = graphs[j + 1];
+        }
+        studentIds[--studentCount]        = null;
+        studentNames[studentCount]        = null;
+        studentImagePaths[studentCount]   = null;
+        graphs[studentCount]              = null;
+        System.out.println("Student " + studentId + " removed.");
+        return true;
+    }
+
+    // =========================================================================
+    // UTILITY
+    // =========================================================================
+
+    public int     getStudentCount()            { return studentCount; }
+    public boolean studentExists(String id)     { return findStudentIndex(id) != -1; }
+
+    /**
+     * Preloads 5 sample students.
+     * FeatureExtractor now runs the full pipeline internally
+     * (RGB -> greyscale -> Niblack -> Zhang-Suen -> features).
+     */
+    public void preloadStudents() {
+        FeatureExtractor extractor = new FeatureExtractor();
+
+        HandwritingGraph g1 = extractor.extractFeatures("data/students/S001/sample.png", "S001");
+        HandwritingGraph g2 = extractor.extractFeatures("data/students/S002/sample.png", "S002");
+        HandwritingGraph g3 = extractor.extractFeatures("data/students/S003/sample.png", "S003");
+        HandwritingGraph g4 = extractor.extractFeatures("data/students/S004/sample.png", "S004");
+        HandwritingGraph g5 = extractor.extractFeatures("data/students/S005/sample.png", "S005");
+        HandwritingGraph g6 = extractor.extractFeatures("data/students/S006/sample.png", "S006");
+        HandwritingGraph g7 = extractor.extractFeatures("data/students/S007/sample.png", "S007");
+
+        
+
+        addDefaultEdges(g1); addDefaultEdges(g2); addDefaultEdges(g3);
+        addDefaultEdges(g4); addDefaultEdges(g5); addDefaultEdges(g6);
+        addDefaultEdges(g7);
+
+        addStudent("S001", "Alice Dlamini",   "data/students/S001/sample.png", g1);
+        addStudent("S002", "Sipho Nkosi",     "data/students/S002/sample.png", g2);
+        addStudent("S003", "Lerato Mokoena",  "data/students/S003/sample.png", g3);
+        addStudent("S004", "Thabo Mahlangu",  "data/students/S004/sample.png", g4);
+        addStudent("S005", "Nomsa Zulu",      "data/students/S005/sample.png", g5);
+        addStudent("S006", "Zanele Khumalo",  "data/students/S006/sample.png", g6);
+        addStudent("S007", "Mandla Sithole",  "data/students/S007/sample.png", g7);
+
+        System.out.println("Database preloaded with " + studentCount + " students.");
+    }
+
+    /**
+     * Adds weighted edges between feature-node pairs.
+     * Weight = normalised similarity between the two feature values (0.0 – 1.0).
+     */
+    private void addDefaultEdges(HandwritingGraph graph) {
+        FeatureNode slant = null, spacing = null, density = null,
+                    loop  = null, pressure = null;
+
+        for (FeatureNode n : graph.getAllNodes()) {
+            switch (n.getFeatureName()) {
+                case "SlantAngle":    slant    = n; break;
+                case "LetterSpacing": spacing  = n; break;
+                case "StrokeDensity": density  = n; break;
+                case "LoopFrequency": loop     = n; break;
+                case "PressureZone":  pressure = n; break;
+            }
+        }
+
+        if (slant   != null && density  != null)
+            graph.addEdge(new FeatureEdge("E1", slant,   density,  edgeWeight(slant.getValue(),   density.getValue(),  110.0), "spatial"));
+        if (spacing != null && loop     != null)
+            graph.addEdge(new FeatureEdge("E2", spacing, loop,     edgeWeight(spacing.getValue(), loop.getValue(),     28.0),  "structural"));
+        if (density != null && pressure != null)
+            graph.addEdge(new FeatureEdge("E3", density, pressure, edgeWeight(density.getValue(), pressure.getValue(), 70.0),  "pressure"));
+        if (slant   != null && spacing  != null)
+            graph.addEdge(new FeatureEdge("E4", slant,   spacing,  edgeWeight(slant.getValue(),   spacing.getValue(),  115.0), "spatial"));
+    }
+
+    /** Closer values -> weight closer to 1.0. */
+    private double edgeWeight(double a, double b, double maxDiff) {
+        return Math.round((1.0 - Math.min(Math.abs(a - b) / maxDiff, 1.0)) * 100.0) / 100.0;
+    }
+
+    private int findStudentIndex(String studentId) {
+        for (int i = 0; i < studentCount; i++)
+            if (studentIds[i].equals(studentId)) return i;
+        return -1;
+    }
+    
+ // In StudentDatabase.java
+    public String getStudentImagePath(String studentId) {
+        int i = findStudentIndex(studentId);
+        return i == -1 ? null : studentImagePaths[i];
+    }
+
+    @Override
+    public String toString() {
+        return "StudentDatabase{studentCount=" + studentCount + "}";
+    }
+}
