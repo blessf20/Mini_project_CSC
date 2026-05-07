@@ -5,7 +5,7 @@
 
 Steps for executing the project from the jar file.\
 Step 1: Navigate to the jar file \
-Step 2: Inside the bin folder run the command "java --module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media -jar run.jar". The program will start running.\
+Step 2: Inside the bin folder run the command "--module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media".\
 
 
 
