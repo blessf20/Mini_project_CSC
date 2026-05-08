@@ -6,7 +6,8 @@
 [Presentation video](https://youtu.be/Fcc75W399pc)
 ### Steps for executing the project from the jar file.<br>
 <b>Step 1</b>: Navigate to the jar file in the dist folder. <br>
-<b>Step 2</b>: Open cmd inside the bin folder and run the command 'java --module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media -jar run.jar'.<br>
+<b>Step 2</b>: Open cmd inside the dist folder and run the command 'java --module-path "C:\javafx-sdk-21\lib" --add-modules javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media -jar StudentDetection.jar'.<br>
+*<b>Note</b> the 'java-sdk-21' on the command can be replaced with the version of java you have on your computer.*
 
 
 ### Steps for executing the project from eclipse <br>
